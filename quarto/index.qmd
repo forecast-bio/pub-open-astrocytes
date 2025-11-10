@@ -1,0 +1,327 @@
+---
+title: '<span class="dark-highlight">OpenAstrocytes</span>'
+subtitle: '<span class="dark-highlight">AI-ready dynamic activity from the astrocyte network</span>'
+
+title-block-banner: img/astro-banner.png
+author-title: ''
+affiliation-title: ''
+published-title: 'Latest'
+# modified-title: 'Updated'
+
+author:
+    - name: Maxine Levesque
+      email: maxine@forecast.bio
+    #   affiliation: " "
+
+    - name: Kira Poskanzer
+
+    - name: " "
+
+date: 31 October 2025
+# date-modified: 31 October 2025
+
+# abstract-title: "TL;DR"
+# abstract: |+
+#     This is a test
+
+#     Hello, some more.
+
+toc-title: "OpenAstrocytes"
+
+fig-format: svg
+filters:
+  - inline-svg
+
+reference-location: margin
+# cap-location: margin
+# citation-location: margin
+bibliography: references.bib
+csl: csl/science.csl
+---
+
+## tl;dr
+
+Astrocytes make up about a third of the cells in your brain, and form a second, distinct brain network from the more-studied neuronal network. As neuroscience has discovered in only the last few years, the astrocyte network carries out extremely important computations 
+
+ 
+
+---
+
+## Background
+
+The human brain is about one-third neurons. But two-thirds of it isn't; and, in recent years, the neuroscience field has become more acutely aware of the incredible importance of the roles played by those other sorts of cells.
+
+::: {#fig-synapse-diagram .column-body}
+![](img/synapse-diagram.png)
+
+Schematic diagram of the **tripartite synapse**. Astrocytic processes (green) wrap around most cortical synaptic connections between neurons, allowing astrocytes to integrate the myriad chemical signals sensed in the neuronal chatter, and downstream, to incorporate that information with other signals about the local brain network sensed from other parts of the extracellular space.
+:::
+
+One of those other thirds is made up of **astrocytes**---one of the principal kinds of *glia* ("glue", referencing old theories of their supposed passivity in brain function). Astrocytes form a cellular network woven between the neurons [@fig-synapse-diagram], and as recent work has demonstrated [@cahill2024network, CITEs], 
+
+### Astrocyte calcium dynamics
+All biological cells must incorporate a massive number of datapoints, coming both from the outside world and also from the internal processes of the cell; indeed, this binding-together of disparate interactions into a shared, coherent, soliton-like packet is, perhaps, what makes life *life* [CITE]. While all the diverse kinds of cells across the entire diverse tree of life have unique approaches to sensing and making sense of these signals, because of shared evolutionary history, a few common structural threads span vast swaths of this diversity. One of those central commonalities is the use of intracellular calcium signaling.
+
+But astrocytes have a 
+
+::: {#fig-astro-video .column-screen-inset-shaded}
+{{< video img/astro-events.mov >}}
+
+(**Left**) Dynamics of astrocyte calcium, as recorded with two-photon imaging of mouse cortical slices expressing the calcium-binding fluorescent indicator GCaMP. (**Right*) . Reproduced from @wang2019accurate.
+:::
+
+ 
+
+---
+
+## Architecture
+
+AI
+
+### Backbone: Distributed, typed WebDatasets with `atdata`
+
+The OpenAstrocytes dataset is built on [`atdata`](https://github.com/foundation-ac/atdata), an open-source package we're developing at Forecast for distributed, interoperable usage of AI-ready datasets.[The original motivation for `atdata` internally was to have fast infrastructure for putting together our rich, multimodal datasets to speed up the iteration cycle for our R&D;]{.aside} `atdata` is built on the open [WebDataset](https://github.com/webdataset/webdataset) format, designed for use as a high-performance AI I/O layer.
+
+`atdata` makes it straightforward to understand structured data from remote repositories:
+
+``` python
+#| echo: false
+
+import sys
+from copy import copy
+
+import numpy as np
+from numpy.typing import NDArray
+
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from forecast.style import HouseStyle
+
+```
+
+``` python
+#| echo: false
+
+# Plotting helpers
+
+def plot_micrograph( s: HouseStyle, image: NDArray,
+            ax: Axes | None = None,
+            scale_x: float = 1.,
+            scale_y: float = 1.,
+            scale_bar: float = 100.,
+            **kwargs
+        ):
+
+    s.show_micrograph( ax, image,
+        scale_x = scale_x,
+        scale_y = scale_y,
+        **kwargs
+    )
+    # plt.imshow( sample_view.image[0] )
+    s.label(
+        data_xlim = (0, scale_bar),
+        data_ylim = None,
+    )
+    plt.xticks( [0, scale_bar], ['0', '100 $\\mu$m'], ha = 'left' )
+    plt.yticks( [] )
+
+```
+
+``` python
+#| label: fig-example-image
+#| fig-column: body-outset-right
+#| fig-cap: Example data from the OpenAstrocytes dataset, showing mean calcium fluorescence in an *ex vivo* brain slice from a mouse over 60 frames (about one minute).
+import atdata
+import openastros
+
+# 
+from toile.schema import Frame
+from openastros.schema import BathApplicationFrame
+
+dataset = (
+    openastros.hive.index
+        .generic.bath_application
+        .dataset
+        .as_type( BathApplicationFrame )
+        # ^ Apply the built-in type lens in preprocessing
+)
+
+n_chunk = 60
+
+# Under the hood, `atdata` takes care of downloading, caching, buffering,
+# unpacking samples, etc.
+
+# Pop off a single sample
+exemplar = next( x for x in dataset.ordered( batch_size = None ) )
+# Pop off a single batch
+batch = next( x for x in dataset.ordered( batch_size = n_chunk) )
+batch_summary = np.quantile( batch.image[:, 0], 0.75, axis = 0 )
+
+with HouseStyle() as s:
+    fig, ax = plt.subplots( figsize = (8, 8) )
+    plot_micrograph( s, batch_summary, ax,
+        scale_x = exemplar.scale_x,
+        scale_y = exemplar.scale_y,
+        scale_bar = 100.,
+        clim = (0, 140),
+    )
+```
+
+The full documentation for `atdata` can be found on [GitHub](https://github.com/foundation-ac/atdata).
+
+### Datasets
+
+Our initial release of OpenAstrocytes is built from two large collections of previously-published calcium imaging from mouse astrocytes, originally analyzed in @reitman2023norepinephrine and @cahill2024network. In total, these datasets comprise about 1M images, making this release among the the largest open datasets of astrocyte calcium dynamics to date, to our knowledge.
+
+ 
+
+------------------------------------------------------------------------
+
+## Demo
+
+Let's take a look at some of the fun structure that we have in the OpenAstrocytes data. Here, we'll be digging into one of the experiments from @cahill2024network, in which *ex vivo* slices from mouse visual cortex had two drugs---baclofen and tACPD^[Baclofen acts as an agonist of the GABA~B~ receptor; tACPD acts as an agonist of the metabotropic glutamate receptor subtypes mGluR2 and mGluR3]---bath-applied across the slice. Here, we'll use the OpenAstrocytes dataset with contemporary to give views into the differences between these two compounds' effects on brain networks.
+
+#### Identifying local physiological responses
+
+Components:
+
+* Image plot of single-patch
+    * Grid of images for patch over time
+    * PC x time plot for this patch
+* (Done) Grid traces for patch PC evolution over time
+* 3D plot of post-exposure PC changes per-patch
+* Clustering results of post-exposure responses
+
+...
+
+``` python
+#| code-fold: true
+#| fig-cap: A test plot
+
+with HouseStyle() as s:
+    xs = np.arange( 0, 600, 5 )
+    ys = np.random.randn( *xs.shape )
+    plt.plot( xs, ys, '-' )
+```
+
+#### Distinguishing impacts of distinct compounds
+
+Components:
+
+* Single-patch comparison for B vs T
+    * Grid of images for patch over time
+    * (Done) PC x time plot for this patch
+* (Done) Population-level impacts on individual PCs
+* Plot of projection onto B vs T subspaces over time for individual recordings
+* Decoding
+
+...
+
+ 
+
+------------------------------------------------------------------------
+
+## Looking ahead
+
+...
+
+#### Building on `atdata`
+
+
+
+`atdata`'s typing functionality already helps for keeping datasets sane; but, where keeping track of sample types really shines is when we register *mappings* between types. As an example, take this from the `openastros` library accompanying this pub:
+
+``` python
+@atdata.lens
+def from_generic( s: ts.Frame ) -> 'BathApplicationFrame':
+    
+    assert s.metadata is not None
+    
+    return BathApplicationFrame(
+        # TODO
+        applied_compound = 'unknown',
+        image = s.image,
+        t_index = s.metadata['frame']['t_index'],
+        t = s.metadata['frame']['t'],
+        #
+        date_acquired = s.metadata['date_acquired'],
+        movie_uuid = s.metadata['uuid'],
+    )
+```
+
+Under the hood, `atdata.lens` keeps track of the full registry lenses between sample schema types. Because lenses can have a very nice compositional behavior [@nlab:lens], this design enables us, as we're building AI models from a bunch of different sources, to easily and automatically aggregate across our diverse hive of WebDatasets, built across different modalities and experiments, taking advantage of the natural ways these data can be compatibly merged.
+
+The full `atdata` ecosystem is architected to go one step further, placing metadata for type schemas of scientific datasets---and the code for these lenses between them!---in a public, decentralized repository on [ATProto](https://atproto.com), the protocol layer underlying the [Bluesky](https://bsky.social/about) social network. This allows AI coding agents on data science tasks to automatically leverage domain knowledge of structured semantic relationships to decide what data to pull from for a given task.[More on `atdata` soon, including our ATProto appview for the full distributed dataset network with MCP support---sign up for updates to hear first as we push more features to the public release!]{.aside}
+
+#### Loving neurons, too
+
+Of course, the brain *also* is one-third neurons---a fact we certainly wouldn't want to forget. This is why we're building out the OpenAstrocytes repository with newly-collated data from the Allen Brain Observatory [@de2023sharing], also formatted with `atdata` for easy use with existing AI workflows.
+
+``` python
+from openastros.datasets import allen
+from openastros.datasets.allen.schema import BrainObservatoryFrame
+
+dataset = (
+    allen
+        .generic.braion_observatory
+        .dataset
+        .as_type( BrainObservatoryFrame )
+)
+# Pull an example sample
+sample = next( x for x in dataset.shuffled( batch_size = None ) )
+
+with HouseStyle() as s:
+    fig, ax = plt.figure( figsize = (8, 8) ))
+    plt.imshow( sample.image )
+```
+
+We're continuing to collate this fantastic dataset's movies of raw two-photon calcium imaging from neurons in visual cortex, as it provides another phenomenal source of neurobiological imaging data for augmenting fine-tuning workflows; since neuronal and astrocytic imaging share tremendous overlap in latent image statistics, we anticipate that combining large datasets of similar dynamic imaging from the two cell types will provides immense benefit to the study of each.
+
+#### A new kind of data
+
+...
+
+ 
+
+------------------------------------------------------------------------
+
+ 
+
+#### Acknowledgements
+
+We'd like to thank **Dr. Michelle Cahill** and **Dr. Michael Reitman** for driving the original experimental work and data collection for the images that went into the initial release of OpenAstrocytes presented here.
+
+Support for the production of OpenAstrocytes at Forecast was generously provided by the Special Initiatives division of the [**Astera Institute**](https://astera.org/).
+
+#### Citation
+
+Please reference this work in BibTeX as:
+
+``` bibtex
+@article{levesque2025openastrocytes,
+  author = {Maxine Levesque and Kira Poskanzer},
+  title = {OpenAstrocytes},
+  journal = {Forecast Research},
+  year = {2025},
+  note = {https://forecast.bio/research/open-astrocytes/},
+}
+```
+
+#### AI use
+
+No language model tools were used to produce any of the code for or writing in this pub.
+
+#### Copyright
+
+Copyright © 2025 Forecast Bio, Inc. The contents of this article are licensed under the Creative Commons [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) license.
+
+ 
+
+------------------------------------------------------------------------
+
+ 
+
+#### References
+
+::: {#refs}
+:::

@@ -78,6 +78,15 @@ But astrocytes have a
 
 AI
 
+```{python}
+import matplotlib.pyplot as plt
+from forecast_style import HouseStyle
+
+with HouseStyle() as s:
+    plt.figure()
+    plt.plot( [0, 1], [3, 2], '-' )
+```
+
 ### Backbone: Distributed, typed WebDatasets with `atdata`
 
 The OpenAstrocytes dataset is built on [`atdata`](https://github.com/foundation-ac/atdata), an open-source package we're developing at Forecast for distributed, interoperable usage of AI-ready datasets.[The original motivation for `atdata` internally was to have fast infrastructure for putting together our rich, multimodal datasets to speed up the iteration cycle for our R&D;]{.aside} `atdata` is built on the open [WebDataset](https://github.com/webdataset/webdataset) format, designed for use as a high-performance AI I/O layer.

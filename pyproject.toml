@@ -6,8 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "atdata>=0.1.3b2",
+    "forecast-style",
     "jupyter>=1.1.1",
     "matplotlib>=3.10.7",
     "numpy>=2.3.4",
     "toile>=0.1.1a2",
 ]
+
+[tool.uv.sources]
+forecast-style = { git = "https://github.com/forecast-bio/style.git" }

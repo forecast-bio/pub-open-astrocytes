@@ -5,13 +5,21 @@ description = "Publication code for OpenAstrocytes: AI-ready dynamic activity fr
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "astrocytes>=0.1.1a1",
     "atdata>=0.1.3b2",
     "forecast-style",
     "jupyter>=1.1.1",
     "matplotlib>=3.10.7",
+    "modal>=1.2.2",
     "numpy>=2.3.4",
     "toile>=0.1.1a2",
 ]
+
+[tool.uv]
+package = true
+
+[project.scripts]
+embed = "oa_pub.analysis.embed:main"
 
 [tool.uv.sources]
 forecast-style = { git = "https://github.com/forecast-bio/style.git" }

@@ -14,6 +14,7 @@ author:
     #   affiliation: " "
 
     - name: Kira Poskanzer
+      email: kira@forecast.bio
 
     - name: " "
 
@@ -93,7 +94,7 @@ The OpenAstrocytes dataset is built on [`atdata`](https://github.com/foundation-
 
 `atdata` makes it straightforward to understand structured data from remote repositories:
 
-``` python
+```{python}
 #| echo: false
 
 import sys
@@ -104,11 +105,10 @@ from numpy.typing import NDArray
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from forecast.style import HouseStyle
-
+from forecast_style import HouseStyle
 ```
 
-``` python
+```{python}
 #| echo: false
 
 # Plotting helpers
@@ -136,34 +136,32 @@ def plot_micrograph( s: HouseStyle, image: NDArray,
 
 ```
 
-``` python
+```{python}
 #| label: fig-example-image
 #| fig-column: body-outset-right
 #| fig-cap: Example data from the OpenAstrocytes dataset, showing mean calcium fluorescence in an *ex vivo* brain slice from a mouse over 60 frames (about one minute).
 import atdata
-import openastros
+import astrocytes
 
-# 
-from toile.schema import Frame
-from openastros.schema import BathApplicationFrame
-
-dataset = (
-    openastros.hive.index
-        .generic.bath_application
-        .dataset
-        .as_type( BathApplicationFrame )
-        # ^ Apply the built-in type lens in preprocessing
+# Dataset sample type schemas
+from toile.schema import (
+    Frame,
+)
+from astrocytes.schema import (
+    BathApplicationFrame,
 )
 
-n_chunk = 60
-
-# Under the hood, `atdata` takes care of downloading, caching, buffering,
-# unpacking samples, etc.
+dataset = (
+    astrocytes.data.bath_application
+        .as_type( BathApplicationFrame )
+)
 
 # Pop off a single sample
 exemplar = next( x for x in dataset.ordered( batch_size = None ) )
+
 # Pop off a single batch
-batch = next( x for x in dataset.ordered( batch_size = n_chunk) )
+n_batch = 60
+batch = next( x for x in dataset.ordered( batch_size = n_batch) )
 batch_summary = np.quantile( batch.image[:, 0], 0.75, axis = 0 )
 
 with HouseStyle() as s:
@@ -197,9 +195,666 @@ Components:
 * Image plot of single-patch
     * Grid of images for patch over time
     * PC x time plot for this patch
-* (Done) Grid traces for patch PC evolution over time
+
+```{python}
+#| code-fold: true
+
+first_movie_id = 'd22f6a65-b3e2-46c2-ba5c-551920af1fe3'
+
+# test_movie_id = '5667b0c5-0896-42cf-b0c0-b88d48473797'
+# test_movie_id = 'd22f6a65-b3e2-46c2-ba5c-551920af1fe3'
+
+# test_patch_i = 9
+# test_patch_j = 12
+
+#
+
+import atdata
+from astrocytes.schema import BathApplicationFrame
+
+#
+
+def _get_movie( movie_uuid: str, verbose: bool = False ) -> list[BathApplicationFrame]:
+    ds = astrocytes.data.bath_application \
+            .as_type( BathApplicationFrame )
+
+    started_movie = False
+    recording_frames = []
+    if verbose:
+        print( 'Iterating frames...' )
+    for frame in ds.ordered( batch_size = None ):
+        if frame.movie_uuid == movie_uuid:
+            if verbose and not started_movie:
+                print( 'Snagging correct movie...' )
+            started_movie = True
+            recording_frames.append( frame )
+        else:
+            if started_movie:
+                # We've moved to a new movie uuid, and so finished up
+                if verbose:
+                    print( 'Got it!' )
+                break
+    
+    return recording_frames
+
+#
+
+movie_frames = _get_movie( first_movie_id, verbose = True )
+```
+
+```{python}
+#| code-fold: true
+#| label: fig-patch-examples
+#| fig-column: page-inset-right
+#| fig-cap: Two example patches from the same recording, showing evolution of calcium activity over time relative to bath application of (TODO COMPOUND). (A small Gaussian smoothing kernel in space and time has been applied here, to aid visualization.)
+
+import numpy as np
+from scipy.ndimage import convolve, gaussian_filter
+
+#
+
+N_PATCHES_Y = 14
+N_PATCHES_X = 14
+patch_size_y = movie_frames[0].image[0].shape[0] / N_PATCHES_Y
+patch_size_x = movie_frames[0].image[0].shape[1] / N_PATCHES_X
+
+#
+
+test_patches = [
+    (10, 12),
+    (3, 7),
+]
+
+test_patch_frames = []
+for cur_i, cur_j in test_patches:
+
+    patch_idx_y = ( int( np.floor( patch_size_y * cur_i ) ),
+                    int( np.ceil( patch_size_y * (cur_i + 1) ) ) )
+    patch_idx_x = ( int( np.floor( patch_size_y * cur_j ) ),
+                    int( np.ceil( patch_size_y * (cur_j + 1) ) ) )
+
+    test_patch_frames.append(
+        np.array( [ 
+            frame.image[0][patch_idx_y[0]:patch_idx_y[1], :][:, patch_idx_x[0]:patch_idx_x[1]]
+            for frame in movie_frames
+        ] )
+    )
+
+# kernel = np.ones( (7, 3, 3) )
+# kernel = kernel / np.sum( kernel )
+# cur_patch_frames = convolve( cur_patch_frames, kernel )
+
+test_patch_frames_filtered = [
+    gaussian_filter( fs, sigma = (3., 0.6, 0.6) )
+    for fs in test_patch_frames
+]
+
+#
+
+dt = movie_frames[3].t
+t_intervene = 300
+
+cmax = 110
+i_frame_compare = (250, 350, 450, 550, 650, 750)
+
+n_patches = len( test_patch_frames_filtered )
+n_frame_compare = len( i_frame_compare )
+
+#
+
+with HouseStyle() as s:
+
+    fig, axs = plt.subplots( n_patches, n_frame_compare,
+        figsize = (10, 4),
+        sharey = True,
+    )
+
+    for i_patch in range( n_patches ):
+
+        cur_patch_frames = test_patch_frames_filtered[i_patch]
+
+        for i_t in range( n_frame_compare ):
+
+            axs[i_patch, i_t].imshow(
+                cur_patch_frames[i_frame_compare[i_t], :, :],
+                #
+                clim = (0, cmax),
+                cmap = 'afmhot',
+            )
+            # plot_micrograph(
+            #     s,
+            #     cur_patch_frames[i_frame_compare[i_t], :, :],
+            #     axs[i_patch, i_t],
+            #     #
+            #     scale_x = movie_frames[0].scale_x,
+            #     scale_y = movie_frames[0].scale_y,
+            #     scale_bar = 50.,
+            #     clim = (0, cmax),
+            #     cmap = 'plasma',
+            # )
+
+            if i_patch == 0:
+                t_val = i_frame_compare[i_t] * dt - t_intervene
+                axs[i_patch, i_t].set_title( f'{t_val:+0.0f}s', fontsize = 12 )
+
+            if i_patch == (n_patches - 1) and i_t == 0:
+                axs[i_patch, i_t].tick_params( axis = 'x', length = 3 )
+                axs[i_patch, i_t].set_xticks( [-0.5, patch_size_x+0.5], ['0', f'{movie_frames[0].scale_x * patch_size_x:0.0f} µm'], ha = 'left' )
+            else:
+                # axs[i_patch, i_t].set_xticks( [-0.5, patch_size_x+0.5], ['', ''] )
+                axs[i_patch, i_t].tick_params( axis = 'x', length = 0 )
+                axs[i_patch, i_t].set_xticks( [-0.5, patch_size_x+0.5], ['', ''] )
+            
+            axs[i_patch, i_t].set_yticks( [] )
+
+            if i_t == 0:
+                axs[i_patch, i_t].set_ylabel( f'Patch {i_patch+1}' )
+
+    # s.label( xaxis_y = 0 )
+    plt.subplots_adjust( wspace = 0.04, hspace = 0. )
+    # plt.show()
+```
+
+TODO narrative
+
+```{python}
+#| code-fold: true
+#| label: fig-patch-example-traces
+#| column: body-outset-right
+#| fig-cap: For each of the two astrocyte network patches shown above in @fig-patch-examples, the time-evolution of three representative embedding PCs relative to the onset of bath application of (TODO COMPOUND). (*N.B.*---A 60s boxcar filter in time has been applied to each PC, leading to blurring of activation edges.)
+
+from tqdm import tqdm
+
+import atdata
+
+import astrocytes
+from astrocytes._datasets._embeddings import (
+    PatchEmbeddingTrace,
+)
+
+#
+
+t_intervene = 300
+baseline_window = (-100, -15)
+plot_window = (-100, 240)
+
+#
+
+wds_url = (
+    'https://data.forecastbio.cloud/testing/patch-pc-traces/bath-application/'
+    + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
+)
+ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
+
+test_traces = [ None for _ in test_patches ]
+for trace in tqdm( ds.ordered( batch_size = None ) ):
+    try:
+        assert trace.metadata is not None and 'uuid' in trace.metadata
+        assert trace.metadata['uuid'] == first_movie_id
+        
+        for i_patch, (cur_i, cur_j) in enumerate( test_patches ):
+            if trace.i_patch == cur_i and trace.j_patch == cur_j:
+                test_traces[i_patch] = trace
+        
+        should_finish = True
+        for x in test_traces:
+            if x is None:
+                should_finish = False
+        if should_finish:
+            break
+
+    except:
+        # print( trace.metadata['uuid'], trace.i_patch, trace.j_patch )
+        continue
+
+# test_sample = next( iter( ds.ordered( batch_size = None ) ) )
+# print( test_sample.values.shape )
+# print( test_sample.ts.shape )
+
+import matplotlib.pyplot as plt
+from forecast_style import HouseStyle
+
+def _baseline_normalize( ts, ys, window ):
+    filter_cur = (
+        (ts >= window[0])
+        & (ts < window[1])
+    )
+    mean = np.mean( ys[filter_cur] )
+    std = np.std( ys[filter_cur] )
+    return (ys - mean) / std, mean, std
+
+#
+
+causal_offset = (84 * dt) / 2.
+t_rel = test_traces[0].ts - t_intervene + (causal_offset)
+
+with HouseStyle( grids = True ) as s:
+
+    fig, axs = plt.subplots( n_patches, 1,
+        figsize = (7, 7),
+        sharex = True,
+        # sharey = True,
+    )
+
+    for i_patch in range( n_patches ):
+        ax = axs[i_patch]
+        cur_trace = test_traces[i_patch]
+
+        values_0_norm, mean_0, std_0 = \
+            _baseline_normalize( t_rel, cur_trace.values[0, :], baseline_window )    
+        values_1_norm, mean_1, std_1 = \
+            _baseline_normalize( t_rel, cur_trace.values[1, :], baseline_window )
+        values_2_norm, mean_2, std_2 = \
+            _baseline_normalize( t_rel, cur_trace.values[4, :], baseline_window )
+
+        filter_plot = (
+            (t_rel >= plot_window[0])
+            & (t_rel < plot_window[1])
+        )
+
+        ax.plot( t_rel[filter_plot], values_0_norm[filter_plot], 'C0-', label = 'PC 1' )
+        ax.plot( t_rel[filter_plot], values_1_norm[filter_plot], 'C2-', label = 'PC 2' )
+        ax.plot( t_rel[filter_plot], values_2_norm[filter_plot], 'C3-', label = 'PC 5' )
+        
+        yl = (-5.5, 10.5)
+
+        ax.fill_between( [0, plot_window[1]], yl[0], yl[1], color = 'k', alpha = 0.05, linewidth = 0 )
+
+        ax.plot( plot_window, [0, 0], 'k-', linewidth = 1 )
+        ax.plot( [plot_window[0], plot_window[0]], yl, 'k-', linewidth = 1 )
+
+        ax.set_xticks( [-90, 0, 60, 120, 180, 240] )
+        # ax.set_yticks( [0, 5, 10] )
+        ax.set_xlim( plot_window )
+        ax.set_ylim( yl )
+
+        ax.set_ylabel( f'Patch {i_patch + 1}' )
+
+        if i_patch == (n_patches - 1):
+            ax.set_xlabel( 'Time (s)' )
+            # ax.set_ylabel( '∆ (baseline SD)' )
+
+            plt.legend( fontsize = 12, loc = 'upper left' )
+
+            ax.text( 5, 8.5, '+ Drug', alpha = 0.5 )
+    
+    # s.label(
+    #     xlabel = 'Time (s)',
+    #     ylabel = '∆ (SDs)',
+    # )
+
+# print( dt * 84 )
+
+```
+
+TODO Narrative
+
+::: {.panel-tabset}
+
+#### PC 1
+
+```{python}
+#| code-fold: true
+#| label: fig-patch-example-grid-pc1
+#| column: screen-inset
+#| fig-cap: TODO
+
+from astrocytes._datasets._embeddings import PatchEmbeddingTrace
+
+#
+
+def _get_movie_traces( movie_uuid: str, verbose: bool = False ) -> list[list[PatchEmbeddingTrace]]:
+
+    # TODO Created `wids` indexed WebDataset for easier indexing in demos
+
+    wds_url = (
+        'https://data.forecastbio.cloud/testing/patch-pc-traces/bath-application/'
+        + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
+    )
+    ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
+
+    started_movie = False
+    movie_traces: list[PatchEmbeddingTrace] = []
+
+    if verbose:
+        print( 'Iterating traces...' )
+    for trace in ds.ordered( batch_size = None ):
+        try:
+            assert trace.metadata is not None
+            assert 'uuid' in trace.metadata
+
+            if trace.metadata['uuid'] == movie_uuid:
+                if verbose and not started_movie:
+                    print( 'Snagging correct movie...' )
+                started_movie = True
+                movie_traces.append( trace )
+
+            else:
+                if started_movie:
+                    # We've moved to a new movie uuid, and so finished up
+                    if verbose:
+                        print( 'Got it!' )
+                    break
+        except:
+            print( 'Skipping trace - no metadata' )
+            continue
+    
+    # Arrange nicely
+    ret = [
+        [
+            None
+            for j in range( N_PATCHES_X )
+        ]
+        for i in range( N_PATCHES_Y )
+    ]
+
+    for trace in movie_traces:
+        ret[trace.i_patch][trace.j_patch] = trace
+
+    return ret
+
+
+##
+
+# Collate full dataset
+
+first_movie_traces = _get_movie_traces( first_movie_id, verbose = False )
+
+# Do plot
+
+i_pc = 0
+
+with HouseStyle() as s:
+
+    fig, axs = plt.subplots( N_PATCHES_Y, N_PATCHES_X,
+        figsize = (16, 12),
+        # sharex = True,
+        # sharey = True,
+    )
+
+    for i in range( N_PATCHES_Y ):
+        for j in range( N_PATCHES_X ):
+            ax = axs[i, j]
+            trace = first_movie_traces[i][j]
+            ts_rel = trace.ts - t_intervene + causal_offset
+
+            cur_values_norm, cur_mean, cur_std = \
+                _baseline_normalize( t_rel, trace.values[i_pc, :], baseline_window )  
+
+            filter_plot = (
+                (ts_rel >= plot_window[0])
+                & (ts_rel < plot_window[1])
+            )
+
+            ax.plot( ts_rel[filter_plot], cur_values_norm[filter_plot], f'C0-', linewidth = 1.5 )
+            
+            xl = ax.get_xlim()
+            ax.plot( xl, [0, 0], 'k-', linewidth = 1, zorder = -200 )
+            # yl = ax.get_ylim()
+            yl = (-10.5, 10.5)
+            ax.fill_between( [0, xl[1]], yl[0], yl[1], color = 'k', alpha = 0.05, linewidth = 0, zorder = 100 )
+
+            if (i, j) in test_patches:
+                ax.fill_between( [xl[0], xl[1]], yl[0], yl[1], facecolor = 'none', edgecolor = f'k', alpha = 0.7, linewidth = 2., zorder = -300 )
+            
+            ax.set_xlim( xl )
+            ax.set_ylim( yl )
+
+            ax.set_yticks( [] )
+            ax.set_xticks( [] )
+    
+    for i in range( 1, N_PATCHES_X ):
+        axs[-1, i].set_xticks( [-90, 0, 240], ['', '', ''] )
+    axs[-1, 0].set_xticks( [-90, 0, 240], ['–90', '0', '240'], fontsize = 8, rotation = 90 )
+
+    for i in range( 0, N_PATCHES_Y - 1 ):
+        # axs[i, 0].set_yticks( [-10, 0, 10], ['', '', ''] )
+        pass
+    axs[-1, 0].set_yticks( [-10, 0, 10], ['-10', '0', '10'], fontsize = 8 )
+
+    fig.subplots_adjust( wspace = 0.1, hspace = 0.1 )
+
+```
+
+#### PC 2
+
+```{python}
+#| code-fold: true
+#| label: fig-patch-example-grid-pc2
+#| column: screen-inset
+#| fig-cap: TODO
+
+# Do plot
+
+i_pc = 1
+
+with HouseStyle() as s:
+
+    fig, axs = plt.subplots( N_PATCHES_Y, N_PATCHES_X,
+        figsize = (16, 12),
+        # sharex = True,
+        # sharey = True,
+    )
+
+    for i in range( N_PATCHES_Y ):
+        for j in range( N_PATCHES_X ):
+            ax = axs[i, j]
+            trace = first_movie_traces[i][j]
+            ts_rel = trace.ts - t_intervene + causal_offset
+
+            cur_values_norm, cur_mean, cur_std = \
+                _baseline_normalize( t_rel, trace.values[i_pc, :], baseline_window )  
+
+            filter_plot = (
+                (ts_rel >= plot_window[0])
+                & (ts_rel < plot_window[1])
+            )
+
+            ax.plot( ts_rel[filter_plot], cur_values_norm[filter_plot], f'C2-', linewidth = 1.5, zorder = 200 )
+            
+            xl = ax.get_xlim()
+            ax.plot( xl, [0, 0], 'k-', linewidth = 1, zorder = -200 )
+            # yl = ax.get_ylim()
+            yl = (-15.5, 15.5)
+            ax.fill_between( [0, xl[1]], yl[0], yl[1], color = 'k', alpha = 0.05, linewidth = 0, zorder = 100 )
+
+            if (i, j) in test_patches:
+                ax.fill_between( [xl[0], xl[1]], yl[0], yl[1], facecolor = 'none', edgecolor = f'k', alpha = 0.7, linewidth = 2., zorder = -300 )
+            
+            ax.set_xlim( xl )
+            ax.set_ylim( yl )
+
+            ax.set_yticks( [] )
+            ax.set_xticks( [] )
+    
+    for i in range( 1, N_PATCHES_X ):
+        axs[-1, i].set_xticks( [-90, 0, 240], ['', '', ''] )
+    axs[-1, 0].set_xticks( [-90, 0, 240], ['–90', '0', '240'], fontsize = 8, rotation = 90 )
+
+    for i in range( 0, N_PATCHES_Y - 1 ):
+        # axs[i, 0].set_yticks( [-10, 0, 10], ['', '', ''] )
+        pass
+    axs[-1, 0].set_yticks( [-15, 0, 15], ['-15', '0', '15'], fontsize = 8 )
+
+    fig.subplots_adjust( wspace = 0.1, hspace = 0.1 )
+
+```
+
+:::
+
 * 3D plot of post-exposure PC changes per-patch
+
+```{python}
+#| echo: false
+
+pcs_show = (0, 1, 4)
+n_traces_show = 1_000
+window_3d = (0, 240)
+
+#
+
+# Collate data
+wds_url = (
+    'https://data.forecastbio.cloud/testing/patch-pc-traces/bath-application/'
+    + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
+)
+ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
+
+i_trace = 0
+trace_data_show = []
+trace_data_raw_show = []
+for trace in tqdm( ds.shuffled( batch_size = None ) ):
+    ts_rel = trace.ts - t_intervene + causal_offset
+    filter_3d = (
+        (ts_rel >= window_3d[0])
+        & (ts_rel < window_3d[1])
+    )
+
+    cur_trace_pcs_post = []
+    for i_pc in pcs_show:
+        cur_vals_norm, _, _ = _baseline_normalize( t_rel, trace.values[i_pc, :], baseline_window )  
+        cur_trace_pcs_post.append( cur_vals_norm[filter_3d] )
+    
+    trace_data_show.append( np.array( cur_trace_pcs_post ) )
+    trace_data_raw_show.append( trace.values[pcs_show, :] )
+
+    i_trace += 1
+    if i_trace >= n_traces_show:
+        break
+    
+trace_data_show = np.array( trace_data_show )
+trace_data_raw_show = np.array( trace_data_raw_show )
+```
+
+Raw values:
+
+```{python}
+#| code-fold: true
+#| label: fig-patch-3d-raw
+#| column: body-outset-right
+#| fig-cap: TODO
+
+random_seed = 89
+rng = np.random.default_rng( random_seed )
+
+#
+
+n_traces_show_raw = 100
+traces_show_raw = rng.permutation( n_traces_show )[:n_traces_show_raw]
+
+with HouseStyle() as s:
+    fig = plt.figure( figsize = (6, 6) )
+    ax = fig.add_subplot( projection = '3d' )
+    ax.view_init( azim = -62 )
+
+    for i_trace in tqdm( traces_show_raw ):
+        # start
+        ax.scatter(
+            trace_data_raw_show[i_trace, 0, 0],
+            trace_data_raw_show[i_trace, 1, 0],
+            trace_data_raw_show[i_trace, 2, 0],
+            color = 'k',
+            s = 3
+        )
+        # end
+        ax.scatter(
+            trace_data_raw_show[i_trace, 0, -1],
+            trace_data_raw_show[i_trace, 1, -1],
+            trace_data_raw_show[i_trace, 2, -1],
+            facecolor = f'C{i_trace % 4}',
+            edgecolor = 'k',
+            linewidth = 0.5,
+            s = 8
+        )
+        # trajectory
+        ax.plot(
+            trace_data_raw_show[i_trace, 0, :],
+            trace_data_raw_show[i_trace, 1, :],
+            trace_data_raw_show[i_trace, 2, :],
+            f'C{i_trace % 4}-',
+            linewidth = 0.5,
+            alpha = 0.8,
+        )
+
+    ax.set_xticks( [0], '' )
+    ax.set_yticks( [0], '' )
+    ax.set_zticks( [0], '' )
+
+    ax.set_xlabel( f'PC {pcs_show[0]+1}' )
+    ax.set_ylabel( f'PC {pcs_show[1]+1}' )
+    ax.set_zlabel( f'PC {pcs_show[2]+1}', rotation = 90 )
+    
+    ax.set_box_aspect(None, zoom=0.82)
+
+```
+
+Normalized:
+
+```{python}
+#| code-fold: true
+#| label: fig-patch-3d-norm
+#| column: body-outset-right
+#| fig-cap: TODO
+
+with HouseStyle() as s:
+    fig = plt.figure( figsize = (6, 6) )
+    ax = fig.add_subplot( projection = '3d' )
+    ax.view_init( elev = 20 )
+
+    for i_trace in tqdm( traces_show_raw ):
+        # start
+        ax.scatter(
+            trace_data_show[i_trace, 0, 0],
+            trace_data_show[i_trace, 1, 0],
+            trace_data_show[i_trace, 2, 0],
+            color = 'k',
+            s = 3
+        )
+        # end
+        ax.scatter(
+            trace_data_show[i_trace, 0, -1],
+            trace_data_show[i_trace, 1, -1],
+            trace_data_show[i_trace, 2, -1],
+            facecolor = f'C{i_trace % 4}',
+            edgecolor = 'k',
+            linewidth = 0.5,
+            s = 8
+        )
+        # trajectory
+        ax.plot(
+            trace_data_show[i_trace, 0, :],
+            trace_data_show[i_trace, 1, :],
+            trace_data_show[i_trace, 2, :],
+            f'C{i_trace % 4}-',
+            linewidth = 0.5,
+            alpha = 0.8,
+        )
+    
+    ax.set_xlim( -32, 32 )
+    ax.set_ylim( -32, 32 )
+    ax.set_zlim( -12, 52 )
+
+    ax.tick_params(axis='y', which='major', pad=-5)
+
+    ax.set_xticks( [-30, 0, 30], ['', '', ''], fontsize = 12 )
+    ax.set_yticks( [-30, 0, 30], ['–30', '', '+30'], rotation = -55, ha = 'left', fontsize = 12 )
+    ax.set_zticks( [-10, 0, 50], ['–10', '', '+50'], fontsize = 12 )
+
+    ax.set_xlabel( f'PC {pcs_show[0]+1}', rotation = -14 )
+    ax.set_ylabel( f'PC {pcs_show[1]+1}', rotation = 37 )
+    ax.set_zlabel( f'PC {pcs_show[2]+1}', rotation = 90 )
+    
+    ax.set_box_aspect((1, 1, 1.1), zoom=0.85)
+
+    # fig.tight_layout()
+
+```
+
 * Clustering results of post-exposure responses
+
+```{python}
+print( 'TODO' )
+```
 
 ...
 

@@ -13,6 +13,10 @@ website:
     #     text: Home
     #   - about.qmd
 
+execute:
+  # freeze: true
+  cache: true
+
 format:
   html:
     theme:

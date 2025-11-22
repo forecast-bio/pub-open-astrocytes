@@ -1,18 +1,18 @@
 [project]
 name = "pub-open-astrocytes"
-version = "0.1.0"
+version = "1.1.0"
 description = "Publication code for OpenAstrocytes: AI-ready dynamic activity from the astrocyte network"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "astrocytes>=0.1.1a5",
-    "atdata>=0.1.3b2",
+    "atdata>=0.1.3b3",
     "forecast-style",
     "jupyter>=1.1.1",
     "matplotlib>=3.10.7",
     "modal>=1.2.2",
     "numpy>=2.3.4",
-    "toile>=0.1.1a2",
+    "toile>=0.1.1a3",
 ]
 
 [tool.uv]

@@ -72,7 +72,7 @@ All biological cells must incorporate a massive number of data-points, coming bo
 But astrocytes have a unique---and incredibly rich---way of signaling with calcium; the best way to appreciate it is to look at it by eye:
 
 ::: {#fig-astro-video .column-screen}
-{{< video img/astro-events.mov >}}
+{{< video img/astro-events.m4v >}}
 
 (**Left**) Dynamics of astrocyte calcium, as recorded with two-photon imaging of mouse cortical slices expressing the calcium-binding fluorescent indicator GCaMP. (**Right**) Segmentation of this activity into discrete events using the AQuA toolbox. Reproduced from @wang2019accurate.
 :::

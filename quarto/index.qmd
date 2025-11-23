@@ -184,11 +184,11 @@ The full documentation for `atdata` can be found on [GitHub](https://github.com/
 
 ### Datasets
 
-Our initial release of OpenAstrocytes is built from two large collections of previously-published calcium imaging from mouse astrocytes, originally analyzed in @reitman2023norepinephrine and @cahill2024network. In total, these datasets comprise in total about 1M images, making this release among the the largest open datasets of astrocyte calcium dynamics to date, to our knowledge.
+Our initial release of OpenAstrocytes is built from two large collections of previously-published calcium imaging from mouse astrocytes, originally analyzed in @reitman2023norepinephrine and @cahill2024network. In total, these datasets comprise close to 1M images, making this release among the the largest open datasets of astrocyte calcium dynamics to date, to our knowledge.
 
-This initial release of the OpenAstrocytes corpus contains two-photon imaging of astrocyte intracellular calcium. These data were recorded during two different experimental setups:
+The images in this first release of the OpenAstrocytes corpus were obtained using two-photon imaging of astrocytes expressing a genetically-encoded calcium sensor. These data were recorded during two different experimental paradigms:
 
-1. *Bath application* (`astrocytes.data.bath_application`): in these experiments, *ex vivo* visual cortical slices from mice were exposed to one of two different agents (baclofen or *t*-ACPD) after a baseline period, with the agents added to the solution bathing the full slice after the time of addition.
+1. *Bath application* (`astrocytes.data.bath_application`): in these experiments, *ex vivo* visual cortical slices from mice were exposed to one of two different agents (baclofen or *t*-ACPD) after a baseline period, with the agents added to the solution bathing the full slice after the onset time.
 2. *Two-photon photo-uncaging* (`astrocytes.data.uncaging`): in these experiments, *ex vivo* visual cortical slices from mice were exposed to one of two caged neurotransmitters (RuBi-GABA or RuBi-glutamate), with a pulse (or pulses) of a second laser applied after a baseline period to "free" the GABA or glutamate from the ruthenium bipyridine cage rendering it inert initially, but only within the small, ~10µm locus directly stimulated by the second laser [@fino2009rubi].
 
 If you want to play around with OpenAstrocytes, you can add it to your Python project with
@@ -1516,7 +1516,7 @@ for i_pcs_seq, n_pc_use in enumerate( n_pc_try ):
 #| code-fold: true
 #| label: fig-decoding
 #| column: body-outset-right
-#| fig-cap: Accuracy of classifying applied pharmacology (baclofen *vs.* *t*-ACPD) from embeddings of a single astrocyte network patch, as a function of time after application of the compound. Colored bands indicate bootstrapped confidence interval of accuracy across cross-validation replicates. Each trace color corresponds to a distinct number of PCs included in the decoder. The black trace indicates a null condition in which the compound labels were permuted at each time point, but decoding was performed otherwise in the same manner---*i.e.*, the random chance level for decoding performance.
+#| fig-cap: Accuracy of classifying applied pharmacology (baclofen *vs.* *t*-ACPD) from embeddings of a single astrocyte network patch using SVC, as a function of time after application of the compound. Colored bands indicate bootstrapped confidence interval of accuracy across cross-validation replicates (each using a random 80:20 train:test split). Each trace color corresponds to a distinct number of PCs included in the decoder. The black trace indicates a null condition in which the compound labels were permuted at each time point, but decoding was performed otherwise in the same manner---*i.e.*, the random chance level for decoding performance.
 #| 
 with HouseStyle( grids = True ) as s:
     fig, ax = plt.subplots( figsize = (8, 5) )
@@ -1640,7 +1640,7 @@ Of course, the brain *also* is one-third neurons---a fact we certainly wouldn't 
 We're continuing to collate this fantastic dataset's movies of raw two-photon calcium imaging from neurons in visual cortex, in order to make this phenomenal source of neurobiological imaging data more accessible for augmenting workflows like AI fine-tuning; since neuronal and astrocytic imaging share tremendous overlap in latent image statistics, we anticipate that combining large datasets of similar dynamic imaging from the two cell types will provides immense benefits to the study of each.
 
 #### A new kind of data
-Here at Forecast, we're building out a new experimental dataset taken not from , but instead from 3D *in vitro* systems built from human induced pluripotent stem cells. Human astrocyte dynamics are a near-completely unexplored frontier within neuroscience; we are extremely excited about the potential lying within this system, as we build out OpenAstrocytes in the next few months with more and more data taken from this completely blank canvas. Stay tuned ;).
+Here at Forecast, we're building out a new experimental dataset centered not on brain slices extracted from mice, but instead on 3D <em>in vitro</em> systems built with human induced pluripotent stem cells. Human astrocyte dynamics are a near-completely unexplored frontier within neuroscience; we are extremely excited about the potential lying within this system, as we build out OpenAstrocytes in the next few months with more and more data taken from this completely blank canvas. Stay tuned ;).
 
  
 

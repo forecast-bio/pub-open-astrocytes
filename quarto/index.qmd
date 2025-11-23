@@ -96,6 +96,32 @@ In particular, we wanted to take advantage of both:
 
 The former of these points is crucial for the nuts and bolts of scaling model training and inference, and has motivated advances in data tooling for AI like WebDatasets [@aizman2020highperformanceiolarge]. The latter, we believe strongly, is a crucial point of departure for biomedical data; while immense progress has been made across domains by taking advantage of the incredible empirical power that lies in scaling, we believe architecting workflows at their foundation around keeping track of the richness of data's explicit structure---and, most crucially, the structured relationships *between* those explicit data structures [@nlab:vertical_categorification]---is a central part of how to leverage the power of these methods for biological applications, where the intrinsic squishy messiness makes purely *tabula rasa* inference of latent structure much more of an uphill battle.
 
+#### Running this pub
+If you're running through the examples in this pub yourself, you'll need additional scripts in separate modules from the snippets below with some bonus content; the full reproducible source for this pub can be found in [this repo](https://github.com/forecast-bio/pub-open-astrocytes/). You'll find the code for generating all the figures folded, like the below:
+
+```{python}
+#| code-fold: true
+#| output: false
+
+## Required imports across the pub
+
+import numpy as np
+
+import matplotlib.pyplot as plt
+from forecast_style import HouseStyle
+
+import atdata
+import astrocytes
+
+##
+
+# For progress bars during development
+from tqdm import tqdm
+
+dev_verbose = False
+"Set to true to generate progress bars during individual cell development"
+```
+
 ### Backbone: Distributed, typed WebDatasets with `atdata`
 
 To realize this, we built the OpenAstrocytes dataset on [`atdata`](https://github.com/foundation-ac/atdata), a new open-source package for structured, distributed, and interoperable streaming datasets we're developing at Forecast to aid in AI training and inference, both in our own work and for the larger investigative community.[The original motivation for `atdata` internally was to have fast infrastructure for speeding up our AI iteration cycle when putting together the rich, multimodal datasets we encounter in biomedical R&amp;D; we're excited about the [features we're working on](#sec-future-atdata) rolling out to the community soon!]{.aside}
@@ -103,59 +129,11 @@ To realize this, we built the OpenAstrocytes dataset on [`atdata`](https://githu
 `atdata` is built on the open [WebDataset](https://github.com/webdataset/webdataset) format, designed for use as a high-performance AI I/O layer used by many other research groups, and so is able to take advantage of their streaming, caching, smart batching, and drop-in PyTorch connections. `atdata` adds functionality that makes it straightforward to understand structured data from remote repositories:
 
 ```{python}
-#| echo: false
-
-import sys
-from copy import copy
-
-from tqdm import tqdm
-
-import numpy as np
-from numpy.typing import NDArray
-
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-from forecast_style import HouseStyle
-
-import atdata
-import astrocytes
-```
-
-```{python}
-#| echo: false
-
-# Plotting helpers
-
-def plot_micrograph( s: HouseStyle, image: NDArray,
-            ax: Axes | None = None,
-            scale_x: float = 1.,
-            scale_y: float = 1.,
-            scale_bar: float = 100.,
-            **kwargs
-        ):
-
-    s.show_micrograph( ax, image,
-        scale_x = scale_x,
-        scale_y = scale_y,
-        **kwargs
-    )
-    # plt.imshow( sample_view.image[0] )
-    s.label(
-        data_xlim = (0, scale_bar),
-        data_ylim = None,
-    )
-    plt.xticks( [0, scale_bar], ['0', '100 $\\mu$m'], ha = 'left' )
-    plt.yticks( [] )
-
-```
-
-```{python}
 #| label: fig-example-image
 #| fig-column: body-outset-right
 #| fig-cap: Example data from the OpenAstrocytes dataset, showing mean calcium fluorescence in an *ex vivo* brain slice from a mouse over 60 frames (about one minute).
-import astrocytes
+from oa_pub.figures import plot_micrograph
 
-# Dataset sample type schema
 from astrocytes.schema import BathApplicationFrame
 
 dataset = astrocytes.data.bath_application \
@@ -170,6 +148,7 @@ batch_summary = np.quantile( batch.image[:, 0], 0.75, axis = 0 )
 
 with HouseStyle() as s:
     fig, ax = plt.subplots( figsize = (8, 8) )
+
     plot_micrograph( s, batch_summary, ax,
         scale_x = exemplar.scale_x,
         scale_y = exemplar.scale_y,
@@ -235,68 +214,56 @@ First, we'll examine the latent feature structure of *local* patches of astrocyt
 Let's download a representative movie from the OpenAstrocytes bath application dataset---the same recording we projected above in @fig-example-image to take a peek at the overall anatomy of the slice---and inspect the behavior of a couple representative patches from it:
 
 ```{python}
-#| echo: false
-from astrocytes.schema import BathApplicationFrame
-
-def _get_movie(
-            movie_uuid: str,
-            verbose: bool = False
-        ) -> list[BathApplicationFrame]:
-    "Helper for "
-
-    def _vprint( *args, **kwargs ):
-        if verbose:
-            print( *args, **kwargs )
-
-    #
-
-    ds = astrocytes.data.bath_application \
-            .as_type( BathApplicationFrame )
-
-    started_movie = False
-    recording_frames = []
-    _vprint( 'Iterating frames...' )
-    for frame in ds.ordered( batch_size = None ):
-        if frame.movie_uuid == movie_uuid:
-            _vprint( 'Snagging correct movie...' )
-            started_movie = True
-            recording_frames.append( frame )
-        else:
-            if started_movie:
-                # We've moved to a new movie uuid, and so finished up
-                _vprint( 'Got it!' )
-                break
-    
-    return recording_frames
-```
-
-```{python}
 #| code-fold: true
 #| label: fig-patch-examples
 #| fig-column: page-inset-right
 #| fig-cap: Two example patches sub-sampled from the same recording as above in @fig-example-image, showing evolution of calcium activity over time relative to bath application of baclofen at $t = 0$. (A small Gaussian smoothing kernel in space and time has been applied here, to aid visualization.)
+
+from oa_pub.analysis import (
+    get_movie,
+    movie_times,
+    #
+    N_PATCHES_Y, N_PATCHES_X,
+)
+
 # Snag a convenient smoother for image preprocessing
 from scipy.ndimage import gaussian_filter
 
-## Constants for DINOv3
-N_PATCHES_Y = 14
-N_PATCHES_X = 14
 
-## Data hyperparameters
+## Demo example parameters
+
+first_movie_id = 'd22f6a65-b3e2-46c2-ba5c-551920af1fe3'
+"Microscope-supplied UUID of the demo movie to show"
+
 test_patches = [
     (10, 12),
     (3, 7),
 ]
 "Indices (vertical, horizontal) of the demo patches to show"
 
-first_movie_id = 'd22f6a65-b3e2-46c2-ba5c-551920af1fe3'
-"Microscope-supplied UUID of the demo movie to show"
+i_frame_compare = (250, 350, 450, 550, 650, 750)
+"Indices of time-slices to display for patch snapshot figure"
+
+#
+
+n_patches = len( test_patch_frames_filtered )
+n_frame_compare = len( i_frame_compare )
+
+
+## Figure parameters
+
+patch_cmax = 110
+"Maximum intensity value for patch snapshot figure"
+
 
 ##
 
-movie_frames = _get_movie( first_movie_id, verbose = False )
+first_movie_frames = get_movie( first_movie_id, verbose = False )
+first_movie_times = movie_times( first_movie_frames )
 
-first_image = movie_frames[0].image[0]
+first_image = first_movie_frames[0].image[0]
+
+#
 patch_size_y = first_image.shape[0] / N_PATCHES_Y
 patch_size_x = first_image.shape[1] / N_PATCHES_X
 
@@ -310,7 +277,7 @@ for cur_i, cur_j in test_patches:
     test_patch_frames.append(
         np.array( [ 
             frame.image[0][patch_idx_y[0]:patch_idx_y[1], :][:, patch_idx_x[0]:patch_idx_x[1]]
-            for frame in movie_frames
+            for frame in first_movie_frames
         ] )
     )
 
@@ -319,19 +286,6 @@ test_patch_frames_filtered = [
     for fs in test_patch_frames
 ]
 
-## Figure parameters
-
-patch_cmax = 110
-"Maximum intensity value for patch snapshot figure"
-
-i_frame_compare = (250, 350, 450, 550, 650, 750)
-"Indices of time-slices to display for patch snapshot figure"
-
-#
-
-dt = movie_frames[3].t
-n_patches = len( test_patch_frames_filtered )
-n_frame_compare = len( i_frame_compare )
 
 ##
 
@@ -343,21 +297,21 @@ with HouseStyle() as s:
     )
 
     for i_patch in range( n_patches ):
-
         cur_patch_frames = test_patch_frames_filtered[i_patch]
 
         for i_t in range( n_frame_compare ):
+            ax = axs[i_patch, i_t]
 
-            axs[i_patch, i_t].imshow(
-                cur_patch_frames[i_frame_compare[i_t], :, :],
-                #
+            ax.imshow( cur_patch_frames[i_frame_compare[i_t], :, :],
                 clim = (0, patch_cmax),
                 cmap = 'afmhot',
             )
 
             if i_patch == 0:
                 t_val = i_frame_compare[i_t] * dt - t_intervene
-                axs[i_patch, i_t].set_title( f'{t_val:+0.0f}s', fontsize = 12 )
+                ax.set_title( f'{t_val:+0.0f}s',
+                    fontsize = 12,
+                )
 
             if i_patch == (n_patches - 1) and i_t == 0:
                 axs[i_patch, i_t].tick_params( axis = 'x', length = 3 )
@@ -443,16 +397,6 @@ for trace in it:
         # Skip traces without needed metadata
         continue
 
-#
-
-def _baseline_normalize( ts, ys, window ):
-    filter_cur = (
-        (ts >= window[0])
-        & (ts < window[1])
-    )
-    mean = np.mean( ys[filter_cur] )
-    std = np.std( ys[filter_cur] )
-    return (ys - mean) / std, mean, std
 
 #
 

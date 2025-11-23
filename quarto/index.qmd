@@ -118,7 +118,7 @@ import astrocytes
 # For progress bars during development
 from tqdm import tqdm
 
-dev_verbose = False
+DEV = False
 "Set to true to generate progress bars during individual cell development"
 ```
 
@@ -194,7 +194,7 @@ At the outset, we'll tuck away any parameters for this experimental setup that w
 #| output: false
 
 # You found me, the parameter!
-t_intervene = 300
+T_INTERVENE = 300
 "The applied compound begins to enter the bath at 300s after recording onset"
 ```
 
@@ -232,35 +232,38 @@ from scipy.ndimage import gaussian_filter
 
 ## Demo example parameters
 
-first_movie_id = 'd22f6a65-b3e2-46c2-ba5c-551920af1fe3'
+FIRST_MOVIE_ID = 'd22f6a65-b3e2-46c2-ba5c-551920af1fe3'
 "Microscope-supplied UUID of the demo movie to show"
 
-test_patches = [
+TEST_PATCHES = [
     (10, 12),
     (3, 7),
 ]
 "Indices (vertical, horizontal) of the demo patches to show"
 
-i_frame_compare = (250, 350, 450, 550, 650, 750)
+IDX_FRAMES_COMPARE = (250, 350, 450, 550, 650, 750)
 "Indices of time-slices to display for patch snapshot figure"
 
 #
 
-n_patches = len( test_patch_frames_filtered )
-n_frame_compare = len( i_frame_compare )
+n_patches = len( TEST_PATCHES )
+n_frame_compare = len( IDX_FRAMES_COMPARE )
 
 
 ## Figure parameters
 
-patch_cmax = 110
+PATCH_CMAX = 110
 "Maximum intensity value for patch snapshot figure"
 
 
 ##
 
-first_movie_frames = get_movie( first_movie_id, verbose = False )
-first_movie_times = movie_times( first_movie_frames )
+first_movie_frames = get_movie( FIRST_MOVIE_ID, verbose = False )
+first_movie_times, movie_dt = movie_times( first_movie_frames )
 
+# TODO The current `OpenAstrocytes` data architecture has imaging channels in
+# the first axis; we're refactoring the frame schemas to make channel contents
+# explicit now that lenses easily handle conversion. Channel 0 here is GCaMP.
 first_image = first_movie_frames[0].image[0]
 
 #
@@ -268,7 +271,7 @@ patch_size_y = first_image.shape[0] / N_PATCHES_Y
 patch_size_x = first_image.shape[1] / N_PATCHES_X
 
 test_patch_frames = []
-for cur_i, cur_j in test_patches:
+for cur_i, cur_j in TEST_PATCHES:
     patch_idx_y = ( int( np.floor( patch_size_y * cur_i ) ),
                     int( np.ceil( patch_size_y * (cur_i + 1) ) ) )
     patch_idx_x = ( int( np.floor( patch_size_y * cur_j ) ),
@@ -301,42 +304,61 @@ with HouseStyle() as s:
 
         for i_t in range( n_frame_compare ):
             ax = axs[i_patch, i_t]
+            cur_image = cur_patch_frames[IDX_FRAMES_COMPARE[i_t]]
 
-            ax.imshow( cur_patch_frames[i_frame_compare[i_t], :, :],
-                clim = (0, patch_cmax),
+            ax.imshow( cur_image,
+                clim = (0, PATCH_CMAX),
                 cmap = 'afmhot',
             )
 
             if i_patch == 0:
-                t_val = i_frame_compare[i_t] * dt - t_intervene
-                ax.set_title( f'{t_val:+0.0f}s',
+                # Show timings on top row
+                ax.set_title( f'{first_movie_times[i_t]:+0.1f}s',
                     fontsize = 12,
                 )
-
-            if i_patch == (n_patches - 1) and i_t == 0:
-                axs[i_patch, i_t].tick_params( axis = 'x', length = 3 )
-                axs[i_patch, i_t].set_xticks( [-0.5, patch_size_x+0.5], ['0', f'{movie_frames[0].scale_x * patch_size_x:0.0f} µm'], ha = 'left' )
-            else:
-                axs[i_patch, i_t].tick_params( axis = 'x', length = 0 )
-                axs[i_patch, i_t].set_xticks( [-0.5, patch_size_x+0.5], ['', ''] )
             
-            axs[i_patch, i_t].set_yticks( [] )
-
             if i_t == 0:
+                # Show patch label on left column
                 axs[i_patch, i_t].set_ylabel( f'Patch {i_patch+1}' )
 
+            axs[i_patch, i_t].tick_params(
+                axis = 'x',
+                length = 0,
+            )
+            axs[i_patch, i_t].set_xticks( [-0.5, patch_size_x + 0.5], ['', ''] )
+            axs[i_patch, i_t].set_yticks( [] )
+
+    # Set up display ticks
+    ax_xticks = axs[-1, 0]
+    ax_xticks.tick_params(
+        axis = 'x',
+        length = 3,
+    )
+    ax_xticks.set_xticks(
+        [-0.5, patch_size_x + 0.5],
+        ['0', f'{first_movie_frames[0].scale_x * patch_size_x:0.0f} µm'],
+        ha = 'left',
+    )
+
+    # Plot a nice lil' highlight behind the post-onset images
     fig.patches.extend( [
-        plt.Rectangle( (0.382, 0.0995), 0.53, 0.82,
+        plt.Rectangle( (0.382, 0.103), 0.53, 0.818,
+            figure = fig,
+            transform = fig.transFigure,
+            #
             fill = True,
+            linewidth = 0,
             color = 'k',
             alpha = 0.05,
             zorder = -1_000,
-            transform = fig.transFigure,
-            figure = fig,
         )
     ] )
 
-    plt.subplots_adjust( wspace = 0.04, hspace = 0. )
+    # Make the spacing nice and ~tight~.
+    plt.subplots_adjust(
+        wspace = 0.04,
+        hspace = 0.,
+    )
 ```
 
 These two patches are good illustrations of the "median" structure of this astrocyte two-photon imaging data. Both patches do exhibit *some* changes after compound application; in comparing, for example, the right four columns with the left two, a close inspection reveals some parts of the patch with evoked activations. But, these changes can be subtle to the unaided or non-specialist eye---particularly here with Patch 2, shown in the bottom row of panels, which we picked to show what a *very* subtle case looks like in raw form.
@@ -349,36 +371,64 @@ However, the large image model is remarkably able to pull out a good deal of str
 #| column: body-outset-right
 #| fig-cap: "For each of the two astrocyte network patches shown above in @fig-patch-examples, each trace shows the time-evolution of one representative embedding PC, relative to the onset of bath application of baclofen at *t* = 0. Time shown as seconds relative to compound entering the bath (shaded box); PC changes shown as multiples of the standard deviation of fluctuations in the pre-application baseline period. (*n.b.*: a 60s boxcar filter in time has been applied to each PC in order to compensate for intrinsic imaging noise, leading to blurring of activation edges.)"
 
+from oa_pub.analysis import (
+    baseline_normalize,
+    is_between,
+)
+
 from astrocytes._datasets._embeddings import (
     PatchEmbeddingTrace,
 )
 
+## Demo params
+DEMO_PCS = [
+    0,
+    1,
+    4,
+]
+
+PC_WINDOW = 84
+"The smoothing window used to postprocess the PCs was 84 frames (~60s)"
+
 ## Figure params
+DEMO_PC_COLORS = [
+    'C0',
+    'C2',
+    'C3',
+]
 
-baseline_window = (-90, -30)
-plot_window = (-100, 240)
-panel_verbose = False
+BASELINE_WINDOW = (-90, -30)
+"The baseline window (in s relative to onset) used for normalization"
+PLOT_WINDOW = (-100, 240)
+"The window (in s relative to onset) to focus on for plotting"
 
-panel_yl = (-8, 13)
+CAUSAL_OFFSET_FRACTION = 0.25
+"The fraction of the full smoothing window width to use as a causal offset"
 
-#
+PANEL_YLIM = (-8, 13)
+PANEL_XTICKS = [-90, 0, 60, 120, 180, 240]
 
-wds_url = (
+
+##
+
+WDS_URL = (
     'https://data.forecastbio.cloud'
     + '/testing/patch-pc-traces/bath-application/'
     + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
 )
+"TODO Migrate over the PCA results to the full typed schema in `astrocytes`"
 ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
 
 it = ds.ordered( batch_size = None )
-if panel_verbose:
-    it = tqdm( it )
+if DEV: it = tqdm( it )
 
-#
+
+##
 
 test_traces = [ None for _ in test_patches ]
 for trace in it:
     try:
+        # Ensure traces have the needed metadata
         assert trace.metadata is not None and 'uuid' in trace.metadata
         assert trace.metadata['uuid'] == first_movie_id
         
@@ -398,14 +448,11 @@ for trace in it:
         continue
 
 
-#
+##
 
-causal_offset = (84 * dt) / 4.
-"The smoothing window used to postprocess the PCs was 84 frames (~60s)"
-t_rel = test_traces[0].ts - t_intervene + causal_offset
+causal_offset = (PC_WINDOW * dt) * CAUSAL_OFFSET_FRACTION
 
 with HouseStyle( grids = True ) as s:
-
     fig, axs = plt.subplots( n_patches, 1,
         figsize = (7, 7),
         sharex = True,
@@ -413,60 +460,51 @@ with HouseStyle( grids = True ) as s:
 
     for i_patch in range( n_patches ):
         ax = axs[i_patch]
+
         cur_trace = test_traces[i_patch]
+        t_rel = cur_trace.ts - T_INTERVENE + causal_offset
+        filter_plot = is_between( t_rel, PLOT_WINDOW )
 
-        values_0_norm, mean_0, std_0 = \
-            _baseline_normalize( t_rel, cur_trace.values[0, :], baseline_window )    
-        values_1_norm, mean_1, std_1 = \
-            _baseline_normalize( t_rel, cur_trace.values[1, :], baseline_window )
-        values_2_norm, mean_2, std_2 = \
-            _baseline_normalize( t_rel, cur_trace.values[4, :], baseline_window )
+        #
 
-        filter_plot = (
-            (t_rel >= plot_window[0])
-            & (t_rel < plot_window[1])
-        )
+        for i_seq, (cur_pc, cur_color) in enumerate(
+                    zip( DEMO_PCS, DEMO_PC_COLORS )
+                ):
+            
+            pc_values_norm, _, _ = baseline_normalize(
+                t_rel, cur_trace.values[cur_pc, :],
+                BASELINE_WINDOW
+            )
 
-        ax.plot( t_rel[filter_plot], values_0_norm[filter_plot],
-            'C0-',
-            label = 'PC 1',
-        )
-        ax.plot( t_rel[filter_plot], values_1_norm[filter_plot],
-            'C2-',
-            label = 'PC 2',
-        )
-        ax.plot( t_rel[filter_plot], values_2_norm[filter_plot],
-            'C3-',
-            label = 'PC 5',
-        )
+            ax.plot( t_rel[filter_plot], pc_values_norm,
+                f'{cur_color}-',
+                label = f'PC {cur_pc + 1}',
+            )
 
-        ax.fill_between( [0, plot_window[1]], panel_yl[0], panel_yl[1],
-            color = 'k',
-            alpha = 0.05,
-            linewidth = 0,
-        )
+            ax.fill_between( [0, PLOT_WINDOW[1]], PANEL_YLIM[0], PANEL_YLIM[1],
+                color = 'k',
+                alpha = 0.05,
+                linewidth = 0,
+            )
 
-        ax.plot( plot_window, [0, 0],
+        # Baseline
+        ax.plot( PLOT_WINDOW, [0, 0],
             'k-',
             linewidth = 1,
         )
-        ax.plot( [plot_window[0], plot_window[0]], panel_yl,
+        # Left y-axis
+        ax.plot( [PLOT_WINDOW[0], PLOT_WINDOW[0]], PANEL_YLIM,
             'k-',
             linewidth = 1,
         )
 
-        ax.set_xticks( [-90, 0, 60, 120, 180, 240] )
-        ax.set_xlim( plot_window )
-        ax.set_ylim( panel_yl )
+        ax.set_xticks( PANEL_XTICKS )
+        ax.set_xlim( PLOT_WINDOW )
+        ax.set_ylim( PANEL_YLIM )
 
         ax.set_ylabel( f'Patch {i_patch + 1}' )
 
-        if i_patch == 0:
-            ax.text( 5, -6.5, '+ Drug',
-                va = 'center',
-                alpha = 0.5,
-            )
-        
+        # Bottom plot gets x label and legend
         if i_patch == (n_patches - 1):
             ax.set_xlabel( 'Time (s)' )
             plt.legend(
@@ -474,8 +512,14 @@ with HouseStyle( grids = True ) as s:
                 loc = 'upper left',
             )
 
-    plt.subplots_adjust( hspace = 0.08 )
+    # "+ Drug" text on one sample axis
+    ax[0].text( 5, -6.5, '+ Drug',
+        va = 'center',
+        alpha = 0.5,
+    )
 
+    # Make the spacing nice and ~tight~.
+    plt.subplots_adjust( hspace = 0.08 )
 ```
 
 #### Response heterogeneity across the imaging field

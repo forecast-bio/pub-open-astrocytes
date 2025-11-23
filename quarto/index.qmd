@@ -235,7 +235,7 @@ from scipy.ndimage import gaussian_filter
 FIRST_MOVIE_ID = 'd22f6a65-b3e2-46c2-ba5c-551920af1fe3'
 "Microscope-supplied UUID of the demo movie to show"
 
-TEST_PATCHES = [
+DEMO_PATCHES = [
     (10, 12),
     (3, 7),
 ]
@@ -246,7 +246,7 @@ IDX_FRAMES_COMPARE = (250, 350, 450, 550, 650, 750)
 
 #
 
-n_patches = len( TEST_PATCHES )
+n_patches = len( DEMO_PATCHES )
 n_frame_compare = len( IDX_FRAMES_COMPARE )
 
 
@@ -264,14 +264,15 @@ first_movie_times, movie_dt = movie_times( first_movie_frames )
 # TODO The current `OpenAstrocytes` data architecture has imaging channels in
 # the first axis; we're refactoring the frame schemas to make channel contents
 # explicit now that lenses easily handle conversion. Channel 0 here is GCaMP.
-first_image = first_movie_frames[0].image[0]
+first_frame = first_movie_frames[0]
+first_image = first_frame.image[0]
 
 #
 patch_size_y = first_image.shape[0] / N_PATCHES_Y
 patch_size_x = first_image.shape[1] / N_PATCHES_X
 
 test_patch_frames = []
-for cur_i, cur_j in TEST_PATCHES:
+for cur_i, cur_j in DEMO_PATCHES:
     patch_idx_y = ( int( np.floor( patch_size_y * cur_i ) ),
                     int( np.ceil( patch_size_y * (cur_i + 1) ) ) )
     patch_idx_x = ( int( np.floor( patch_size_y * cur_j ) ),
@@ -336,7 +337,7 @@ with HouseStyle() as s:
     )
     ax_xticks.set_xticks(
         [-0.5, patch_size_x + 0.5],
-        ['0', f'{first_movie_frames[0].scale_x * patch_size_x:0.0f} µm'],
+        ['0', f'{first_frame.scale_x * patch_size_x:0.0f} µm'],
         ha = 'left',
     )
 
@@ -417,7 +418,9 @@ WDS_URL = (
     + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
 )
 "TODO Migrate over the PCA results to the full typed schema in `astrocytes`"
-ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
+ds = atdata.Dataset[PatchEmbeddingTrace]( WDS_URL )
+
+DEV = True
 
 it = ds.ordered( batch_size = None )
 if DEV: it = tqdm( it )
@@ -425,16 +428,18 @@ if DEV: it = tqdm( it )
 
 ##
 
-test_traces = [ None for _ in test_patches ]
+test_traces = [ None for _ in DEMO_PATCHES ]
 for trace in it:
     try:
         # Ensure traces have the needed metadata
         assert trace.metadata is not None and 'uuid' in trace.metadata
-        assert trace.metadata['uuid'] == first_movie_id
-        
-        for i_patch, (cur_i, cur_j) in enumerate( test_patches ):
+        assert trace.metadata['uuid'] == FIRST_MOVIE_ID
+
+        for i_patch, (cur_i, cur_j) in enumerate( DEMO_PATCHES ):
             if trace.i_patch == cur_i and trace.j_patch == cur_j:
                 test_traces[i_patch] = trace
+                if DEV:
+                    print( f'Snagged trace for {cur_i, cur_j}')
         
         should_finish = True
         for x in test_traces:
@@ -450,7 +455,7 @@ for trace in it:
 
 ##
 
-causal_offset = (PC_WINDOW * dt) * CAUSAL_OFFSET_FRACTION
+causal_offset = (PC_WINDOW * movie_dt) * CAUSAL_OFFSET_FRACTION
 
 with HouseStyle( grids = True ) as s:
     fig, axs = plt.subplots( n_patches, 1,
@@ -476,16 +481,17 @@ with HouseStyle( grids = True ) as s:
                 BASELINE_WINDOW
             )
 
-            ax.plot( t_rel[filter_plot], pc_values_norm,
+            ax.plot( t_rel[filter_plot], pc_values_norm[filter_plot],
                 f'{cur_color}-',
                 label = f'PC {cur_pc + 1}',
             )
 
-            ax.fill_between( [0, PLOT_WINDOW[1]], PANEL_YLIM[0], PANEL_YLIM[1],
-                color = 'k',
-                alpha = 0.05,
-                linewidth = 0,
-            )
+        # Drug application overlay
+        ax.fill_between( [0, PLOT_WINDOW[1]], PANEL_YLIM[0], PANEL_YLIM[1],
+            color = 'k',
+            alpha = 0.05,
+            linewidth = 0,
+        )
 
         # Baseline
         ax.plot( PLOT_WINDOW, [0, 0],
@@ -513,7 +519,7 @@ with HouseStyle( grids = True ) as s:
             )
 
     # "+ Drug" text on one sample axis
-    ax[0].text( 5, -6.5, '+ Drug',
+    axs[0].text( 5, -6.5, '+ Drug',
         va = 'center',
         alpha = 0.5,
     )
@@ -535,79 +541,34 @@ Indeed, when we look at the feature dynamics across all patches within the imagi
 #| column: screen-inset
 #| fig-cap: "Baseline-normalized changes in DINOv3 embedding PC1 features after bath application of baclofen for each of the 196 astrocyte network patches, derived from the same slice depicted above in @fig-example-image. The locations of the two representative patches shown in greater detail in @fig-patch-examples and @fig-patch-example-traces are highlighted in black boxes. Note the heterogeneity of responses across the imaging field, as well as the correspondence between portions of the network exhibiting PC1 activation and anatomical features of the local astrocyte network in @fig-example-image. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation."
 
-def _get_movie_traces(
-            movie_uuid: str,
-            verbose: bool = False
-        ) -> list[list[PatchEmbeddingTrace]]:
-    "Return all patch embedding traces for a given recording"
-
-    def _vprint( *args, **kwargs ):
-        if verbose: print( *args, **kwargs )
-
-    # TODO Change over to `atdata`'s new `wids` indexed
-    # WebDatasets for faster streaming  in demos
-    wds_url = (
-        'https://data.forecastbio.cloud'
-        + '/testing/patch-pc-traces/bath-application/'
-        + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
-    )
-    ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
-
-    started_movie = False
-    movie_traces: list[PatchEmbeddingTrace] = []
-
-    _vprint( 'Iterating traces...' )
-    for trace in ds.ordered( batch_size = None ):
-        try:
-            assert trace.metadata is not None
-            assert 'uuid' in trace.metadata
-
-            if trace.metadata['uuid'] == movie_uuid:
-                _vprint( 'Snagging correct movie...' )
-                started_movie = True
-                movie_traces.append( trace )
-
-            else:
-                if started_movie:
-                    # We've moved to a new movie uuid,
-                    # and so are finished here
-                    _vprint( 'Got it!' )
-                    break
-        except:
-            # Skip trace - no metadata
-            continue
-    
-    # Arrange result spatially
-    ret = [
-        [
-            None
-            for j in range( N_PATCHES_X )
-        ]
-        for i in range( N_PATCHES_Y )
-    ]
-
-    for trace in movie_traces:
-        ret[trace.i_patch][trace.j_patch] = trace
-
-    return ret
+from oa_pub.analysis import get_movie_traces
 
 
-##
-
-# Plot params
-grids_ylim = (-12.5, 12.5)
+## Plot params
+GRIDS_YLIM = (-12.5, 12.5)
+GRIDS_XTICKS = [-90, 0, 240]
+GRIDS_YTICKS = [-10, 0, 10]
 
 
 ##
 
 # Collate full dataset
-first_movie_traces = _get_movie_traces(
-    first_movie_id,
-    verbose = False,
+first_movie_traces = get_movie_traces(
+    FIRST_MOVIE_ID,
+    verbose = DEV,
 )
 
-# Do plot
-i_pc = 0
+
+##
+
+def _grid_plot( ax: Axes ):
+    """TODO"""
+    # TODO HERE
+    pass
+
+
+## Do the grid plot itself
+plot_pc = 0
 
 with HouseStyle() as s:
 
@@ -620,48 +581,64 @@ with HouseStyle() as s:
             ax = axs[i, j]
 
             trace = first_movie_traces[i][j]
-            ts_rel = trace.ts - t_intervene + causal_offset
+            ts_rel = trace.ts - T_INTERVENE + causal_offset
 
-            cur_values_norm, _, _ = \
-                _baseline_normalize( t_rel, trace.values[i_pc, :], baseline_window )  
+            cur_values_norm, _, _ = baseline_normalize(
+                t_rel, trace.values[plot_pc, :],
+                BASELINE_WINDOW,
+            )  
+            filter_plot = is_between( ts_rel, PLOT_WINDOW )
 
-            filter_plot = (
-                (ts_rel >= plot_window[0])
-                & (ts_rel < plot_window[1])
-            )
+            #
 
             ax.plot( ts_rel[filter_plot], cur_values_norm[filter_plot],
-                'C0-',
+                f'{DEMO_PC_COLORS[plot_pc]}-',
                 linewidth = 1.5,
             )
             
             xl = ax.get_xlim()
-            ax.plot( xl, [0, 0], 'k-', linewidth = 1, zorder = -200 )
-            yl = grids_ylim
-            ax.fill_between( [0, xl[1]], yl[0], yl[1], color = 'k', alpha = 0.05, linewidth = 0, zorder = 100 )
+            ax.plot( xl, [0, 0],
+                'k-',
+                linewidth = 1,
+                zorder = -200,
+            )
+            ax.fill_between( [0, xl[1]], GRIDS_YLIM[0], GRIDS_YLIM[1],
+                color = 'k',
+                alpha = 0.05,
+                linewidth = 0,
+                zorder = 100,
+            )
 
-            if (i, j) in test_patches:
-                ax.fill_between( [xl[0], xl[1]], yl[0], yl[1], facecolor = 'none', edgecolor = f'k', alpha = 0.7, linewidth = 2., zorder = -300 )
+            if (i, j) in DEMO_PATCHES:
+                ax.fill_between( [xl[0], xl[1]], GRIDS_YLIM[0], GRIDS_YLIM[1],
+                    facecolor = 'none',
+                    edgecolor = f'k',
+                    alpha = 0.7,
+                    linewidth = 2.,
+                    zorder = -300,
+                )
             
             ax.set_xlim( xl )
-            ax.set_ylim( yl )
+            ax.set_ylim( GRIDS_YLIM )
 
             ax.set_yticks( [] )
             ax.set_xticks( [] )
     
+    # Add axis labels to only bottom-left
     for i in range( 1, N_PATCHES_X ):
-        axs[-1, i].set_xticks( [-90, 0, 240], ['', '', ''] )
-    axs[-1, 0].set_xticks( [-90, 0, 240], ['–90', '0', '240'],
+        axs[-1, i].set_xticks( GRIDS_XTICKS, ['' for _ in GRIDS_XTICKS] )
+    
+    axs[-1, 0].set_xticks( GRIDS_XTICKS, [f'{x:+0.0f}' for x in GRIDS_XTICKS],
         fontsize = 11,
         rotation = 90,
     )
 
-    axs[-1, 0].set_yticks( [-10, 0, 10], ['-10', '0', '10'],
+    axs[-1, 0].set_yticks( GRIDS_YTICKS, [f'{x:+0.0f}' for x in GRIDS_YTICKS],
         fontsize = 11,
     )
 
+    # Make spacing nice and ~tight~.
     fig.subplots_adjust( wspace = 0.1, hspace = 0.1 )
-
 ```
 
 ##### PC 2
@@ -687,10 +664,10 @@ with HouseStyle() as s:
         for j in range( N_PATCHES_X ):
             ax = axs[i, j]
             trace = first_movie_traces[i][j]
-            ts_rel = trace.ts - t_intervene + causal_offset
+            ts_rel = trace.ts - T_INTERVENE + causal_offset
 
-            cur_values_norm, cur_mean, cur_std = \
-                _baseline_normalize( t_rel, trace.values[i_pc, :], baseline_window )  
+            cur_values_norm, _, _ = \
+                baseline_normalize( t_rel, trace.values[i_pc, :], baseline_window )  
 
             filter_plot = (
                 (ts_rel >= plot_window[0])

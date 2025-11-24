@@ -32,10 +32,6 @@ reference-location: margin
 bibliography: references.bib
 csl: csl/science.csl
 
-execute:
-    freeze: true
-    cache: true
-
 repo-url: https://github.com/forecast-bio/pub-open-astrocytes
 repo-actions: [source, issue]
 ---

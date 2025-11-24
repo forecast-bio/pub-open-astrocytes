@@ -2,19 +2,23 @@
 
 **OpenAstrocytes: AI-ready dynamic activity from the astrocyte network**
 
-This repository contains the code and analysis for the OpenAstrocytes publication, demonstrating how off-the-shelf vision transformer embeddings (DINOv3) capture rich structure in astrocyte calcium dynamics.
+This repository contains the code and analysis for the [OpenAstrocytes](https://forecast.bio/research/open-astrocytes) pub, demonstrating how off-the-shelf vision transformer embeddings (DINOv3) capture rich structure in astrocyte calcium dynamics.
+
+The analysis demonstrates that DINOv3 patch embeddings applied to astrocyte calcium imaging data can:
+- Reflect astrocyte network anatomy
+- Capture evoked dynamics in response to compound applications
+- Generalize across distinct experimental sessions and subjects
+- Enable accurate decoding of applied compounds from single patches
+
+—❤️‍🔥 [Forecast](https://forecast.bio/)
+
 
 ## Overview
 
 This project combines:
 - A **Python package** (`oa_pub`) with analysis utilities for working with astrocyte calcium imaging and embeddings
-- A **Quarto document** that generates the full publication with embedded analysis, figures, and narrative
+- A **Quarto document** that generates the full pub static site with embedded analysis, figures, and narrative
 
-The analysis demonstrates that DINOv3 patch embeddings applied to astrocyte calcium imaging data can:
-- Reflect astrocyte network anatomy
-- Capture evoked dynamics in response to compound applications
-- Generalize across distinct pharmacological profiles
-- Enable accurate decoding of applied compounds from single patches
 
 ## Repository Structure
 
@@ -39,11 +43,13 @@ pub-open-astrocytes/
 └── README.md               # This file
 ```
 
+
 ## Prerequisites
 
 - **Python 3.12** or later
 - **uv** package manager ([installation instructions](https://github.com/astral-sh/uv))
 - **Quarto** ([installation instructions](https://quarto.org/docs/get-started/))
+
 
 ## Installation
 
@@ -70,9 +76,10 @@ uv sync
 uv run python -c "import oa_pub; print('Success!')"
 ```
 
-## Reproducing the Publication
 
-### Generate the full publication
+## Reproducing the pub
+
+### Generate the full pub
 
 ```bash
 cd quarto
@@ -83,7 +90,7 @@ This will:
 - Execute all Python code blocks in `index.qmd`
 - Load data from the OpenAstrocytes dataset
 - Generate all figures and analyses
-- Output the complete publication to `_public/index.html`
+- Output the complete pub to `_public/index.html`
 
 **Note:** The first render will take significant time as it streams data from the cloud and computes embeddings. Subsequent renders use Quarto's caching system for faster execution.
 
@@ -94,7 +101,7 @@ cd quarto
 uv run quarto preview
 ```
 
-This opens a browser with the publication and automatically reloads when you make changes to `index.qmd`.
+This opens a browser with the pub and automatically reloads when you make changes to `index.qmd`.
 
 ## Working with the Python Package
 
@@ -156,56 +163,32 @@ uv add astrocytes
 
 The `oa_pub.analysis` module handles data streaming automatically when you call functions like `get_movie()` and `get_movie_traces()`.
 
-## Development
-
-### Adding dependencies
-
-```bash
-# Add a runtime dependency
-uv add <package-name>
-
-# Add a development dependency
-uv add --dev <package-name>
-```
-
-### Running tests
-
-```bash
-# Run any test scripts
-uv run python -m pytest
-```
-
-### Code structure conventions
-
-- Private modules use `_` prefix (e.g., `_extraction.py`)
-- Public API is exposed through `__init__.py` files
-- All functions include NumPy-style docstrings
-- Use `verbose` parameters for progress output during data loading
+Use `verbose` parameters for progress output during data loading.
 
 ## Citation
 
 If you use this code or the OpenAstrocytes dataset in your research, please cite:
 
 ```bibtex
-@article{openastrocytes2025,
-  title={OpenAstrocytes: AI-ready dynamic activity from the astrocyte network},
-  author={Levesque, Maxine and Poskanzer, Kira},
-  year={2025}
+@article{levesque2025openastrocytes,
+  author = {Maxine Levesque and Kira Poskanzer},
+  title = {OpenAstrocytes},
+  journal = {Forecast Research},
+  year = {2025},
+  note = {https://forecast.bio/research/open-astrocytes/},
 }
 ```
 
 ## Links
 
-- **OpenAstrocytes Dataset**: Available via the `astrocytes` Python package
-- **Forecast Bio**: [https://forecast.bio](https://forecast.bio)
-- **Publication**: [View the rendered publication](_public/index.html)
+- **OpenAstrocytes data hive**: Available via the [`astrocytes`](https://github.com/forecast-bio/open-astrocytes) package
+- **Forecast**: [https://forecast.bio](https://forecast.bio/)
+- **OpenAstrocytes pub**: [View the rendered pub](https://forecast.bio/research/open-astrocytes)
 
 ## License
 
-This project is released under [LICENSE](LICENSE).
+This project is released under the [LICENSE](LICENSE).
 
 ## Contact
 
-For questions or issues:
-- Open an issue on GitHub
-- Email: maxine@forecast.bio
+For questions or issues, [open a GitHub issue](https://github.com/forecast-bio/pub-open-astrocytes/issues).

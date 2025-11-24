@@ -1,1 +1,5 @@
+# quarto render cache
 /.quarto/
+
+# quarto execution cache
+/index_files/**

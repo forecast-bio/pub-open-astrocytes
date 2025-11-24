@@ -5,7 +5,7 @@ subtitle: '<span class="dark-highlight">AI-ready dynamic activity from the astro
 title-block-banner: img/astro-banner.png
 author-title: ''
 affiliation-title: ''
-published-title: 'Latest (v1.1)'
+published-title: 'Latest (v1.2)'
 # modified-title: 'Updated'
 
 author:
@@ -18,7 +18,7 @@ author:
 
     - name: " "
 
-date: 21 November 2025
+date: 23 November 2025
 # date-modified: 31 October 2025
 
 toc-title: "OpenAstrocytes"
@@ -44,12 +44,14 @@ Astrocytes make up about a third of the cells in your brain, and form a second, 
 
 Take a look:
 
-```bash
+``` bash
 pip install astrocytes
 
-# or, with `uv`,
+# or, with `uv`:
 uv add astrocytes
 ```
+
+As a demo of the richness of the OpenAstrocytes data, we take a look at one dataset---measuring changes of astrocyte activity [in response to the application of distinct applied compounds](#fig-patch-examples-compare)---by applying a recently-released large vision transformer model, DINOv3. We find that off-the-shelf patch embeddings have subspaces that reflect [astrocyte network anatomy](#fig-patch-3d-raw) and [evoked dynamics](#fig-patch-3d-norm); that these subspaces capture [generalizable, distinct profiles of astrocyte calcium activity](#fig-patch-pcs-population) evoked by different compounds; and, that the information in a single ~60µm patch is sufficient to [accurately decode the identity of the applied compound](#fig-decoding).
 
  
 
@@ -71,8 +73,8 @@ All biological cells must incorporate a massive number of data-points, coming bo
 
 But astrocytes have a unique---and incredibly rich---way of signaling with calcium; the best way to appreciate it is to look at it by eye:
 
-::: {#fig-astro-video .column-screen}
-{{< video img/astro-events.mov >}}
+::: {#fig-astro-video .column-screen-inset-shaded}
+{{< video img/astro-events.m4v >}}
 
 (**Left**) Dynamics of astrocyte calcium, as recorded with two-photon imaging of mouse cortical slices expressing the calcium-binding fluorescent indicator GCaMP. (**Right**) Segmentation of this activity into discrete events using the AQuA toolbox. Reproduced from @wang2019accurate.
 :::
@@ -96,6 +98,44 @@ In particular, we wanted to take advantage of both:
 
 The former of these points is crucial for the nuts and bolts of scaling model training and inference, and has motivated advances in data tooling for AI like WebDatasets [@aizman2020highperformanceiolarge]. The latter, we believe strongly, is a crucial point of departure for biomedical data; while immense progress has been made across domains by taking advantage of the incredible empirical power that lies in scaling, we believe architecting workflows at their foundation around keeping track of the richness of data's explicit structure---and, most crucially, the structured relationships *between* those explicit data structures [@nlab:vertical_categorification]---is a central part of how to leverage the power of these methods for biological applications, where the intrinsic squishy messiness makes purely *tabula rasa* inference of latent structure much more of an uphill battle.
 
+#### Running this pub
+If you're running through the examples in this pub yourself, you'll need additional scripts in separate modules from the snippets below with some bonus content; the full reproducible source for this pub can be found in [this repo](https://github.com/forecast-bio/pub-open-astrocytes/).
+
+You'll find each cell of code folded above the figure that cell generates, like so:
+
+```{python}
+#| code-fold: true
+#| output: false
+
+## Required imports across the pub
+
+import numpy as np
+
+import matplotlib.pyplot as plt
+from forecast_style import HouseStyle
+
+import atdata
+import astrocytes
+
+
+##
+
+# As noted later, there is still intrinsic randomness imparted by the random
+# shuffling for `webdataset`'s streaming that is difficult to address w/o
+# support for `wids` in `atdata`
+RANDOM_SEED = 89
+rng = np.random.RandomState( RANDOM_SEED )
+
+
+##
+
+# For progress bars during development
+from tqdm import tqdm
+
+DEV = False
+"Set to true to generate progress bars during individual cell development"
+```
+
 ### Backbone: Distributed, typed WebDatasets with `atdata`
 
 To realize this, we built the OpenAstrocytes dataset on [`atdata`](https://github.com/foundation-ac/atdata), a new open-source package for structured, distributed, and interoperable streaming datasets we're developing at Forecast to aid in AI training and inference, both in our own work and for the larger investigative community.[The original motivation for `atdata` internally was to have fast infrastructure for speeding up our AI iteration cycle when putting together the rich, multimodal datasets we encounter in biomedical R&amp;D; we're excited about the [features we're working on](#sec-future-atdata) rolling out to the community soon!]{.aside}
@@ -103,60 +143,16 @@ To realize this, we built the OpenAstrocytes dataset on [`atdata`](https://githu
 `atdata` is built on the open [WebDataset](https://github.com/webdataset/webdataset) format, designed for use as a high-performance AI I/O layer used by many other research groups, and so is able to take advantage of their streaming, caching, smart batching, and drop-in PyTorch connections. `atdata` adds functionality that makes it straightforward to understand structured data from remote repositories:
 
 ```{python}
-#| echo: false
-
-import sys
-from copy import copy
-
-from tqdm import tqdm
-
-import numpy as np
-from numpy.typing import NDArray
-
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-from forecast_style import HouseStyle
-
-import atdata
-import astrocytes
-```
-
-```{python}
-#| echo: false
-
-# Plotting helpers
-
-def plot_micrograph( s: HouseStyle, image: NDArray,
-            ax: Axes | None = None,
-            scale_x: float = 1.,
-            scale_y: float = 1.,
-            scale_bar: float = 100.,
-            **kwargs
-        ):
-
-    s.show_micrograph( ax, image,
-        scale_x = scale_x,
-        scale_y = scale_y,
-        **kwargs
-    )
-    # plt.imshow( sample_view.image[0] )
-    s.label(
-        data_xlim = (0, scale_bar),
-        data_ylim = None,
-    )
-    plt.xticks( [0, scale_bar], ['0', '100 $\\mu$m'], ha = 'left' )
-    plt.yticks( [] )
-
-```
-
-```{python}
 #| label: fig-example-image
 #| fig-column: body-outset-right
 #| fig-cap: Example data from the OpenAstrocytes dataset, showing mean calcium fluorescence in an *ex vivo* brain slice from a mouse over 60 frames (about one minute).
-import astrocytes
 
-# Dataset sample type schema
+from oa_pub.figures import plot_micrograph
+
 from astrocytes.schema import BathApplicationFrame
+
+
+##
 
 dataset = astrocytes.data.bath_application \
             .as_type( BathApplicationFrame )
@@ -168,8 +164,12 @@ exemplar = next( x for x in dataset.ordered( batch_size = None ) )
 batch = next( x for x in dataset.ordered( batch_size = 60) )
 batch_summary = np.quantile( batch.image[:, 0], 0.75, axis = 0 )
 
+
+##
+
 with HouseStyle() as s:
     fig, ax = plt.subplots( figsize = (8, 8) )
+
     plot_micrograph( s, batch_summary, ax,
         scale_x = exemplar.scale_x,
         scale_y = exemplar.scale_y,
@@ -184,11 +184,11 @@ The full documentation for `atdata` can be found on [GitHub](https://github.com/
 
 ### Datasets
 
-Our initial release of OpenAstrocytes is built from two large collections of previously-published calcium imaging from mouse astrocytes, originally analyzed in @reitman2023norepinephrine and @cahill2024network. In total, these datasets comprise in total about 1M images, making this release among the the largest open datasets of astrocyte calcium dynamics to date, to our knowledge.
+Our initial release of OpenAstrocytes is built from two large collections of previously-published calcium imaging from mouse astrocytes, originally analyzed in @reitman2023norepinephrine and @cahill2024network. In total, these datasets comprise close to 1M images, making this release among the the largest open datasets of astrocyte calcium dynamics to date, to our knowledge.
 
-This initial release of the OpenAstrocytes corpus contains two-photon imaging of astrocyte intracellular calcium. These data were recorded during two different experimental setups:
+The images in this first release of the OpenAstrocytes corpus were obtained using two-photon imaging of astrocytes expressing a genetically-encoded calcium sensor. These data were recorded during two different experimental paradigms:
 
-1. *Bath application* (`astrocytes.data.bath_application`): in these experiments, *ex vivo* visual cortical slices from mice were exposed to one of two different agents (baclofen or *t*-ACPD) after a baseline period, with the agents added to the solution bathing the full slice after the time of addition.
+1. *Bath application* (`astrocytes.data.bath_application`): in these experiments, *ex vivo* visual cortical slices from mice were exposed to one of two different agents (baclofen or *t*-ACPD) after a baseline period, with the agents added to the solution bathing the full slice after the onset time.
 2. *Two-photon photo-uncaging* (`astrocytes.data.uncaging`): in these experiments, *ex vivo* visual cortical slices from mice were exposed to one of two caged neurotransmitters (RuBi-GABA or RuBi-glutamate), with a pulse (or pulses) of a second laser applied after a baseline period to "free" the GABA or glutamate from the ruthenium bipyridine cage rendering it inert initially, but only within the small, ~10µm locus directly stimulated by the second laser [@fino2009rubi].
 
 If you want to play around with OpenAstrocytes, you can add it to your Python project with
@@ -196,7 +196,7 @@ If you want to play around with OpenAstrocytes, you can add it to your Python pr
 ``` bash
 pip install astrocytes
 
-# or, if you're *really* cool 😎,
+# or, if you're *really* cool 😎:
 uv add astrocytes
 ```
 
@@ -215,7 +215,7 @@ At the outset, we'll tuck away any parameters for this experimental setup that w
 #| output: false
 
 # You found me, the parameter!
-t_intervene = 300
+T_INTERVENE = 300. # s
 "The applied compound begins to enter the bath at 300s after recording onset"
 ```
 
@@ -235,73 +235,69 @@ First, we'll examine the latent feature structure of *local* patches of astrocyt
 Let's download a representative movie from the OpenAstrocytes bath application dataset---the same recording we projected above in @fig-example-image to take a peek at the overall anatomy of the slice---and inspect the behavior of a couple representative patches from it:
 
 ```{python}
-#| echo: false
-from astrocytes.schema import BathApplicationFrame
-
-def _get_movie(
-            movie_uuid: str,
-            verbose: bool = False
-        ) -> list[BathApplicationFrame]:
-    "Helper for "
-
-    def _vprint( *args, **kwargs ):
-        if verbose:
-            print( *args, **kwargs )
-
-    #
-
-    ds = astrocytes.data.bath_application \
-            .as_type( BathApplicationFrame )
-
-    started_movie = False
-    recording_frames = []
-    _vprint( 'Iterating frames...' )
-    for frame in ds.ordered( batch_size = None ):
-        if frame.movie_uuid == movie_uuid:
-            _vprint( 'Snagging correct movie...' )
-            started_movie = True
-            recording_frames.append( frame )
-        else:
-            if started_movie:
-                # We've moved to a new movie uuid, and so finished up
-                _vprint( 'Got it!' )
-                break
-    
-    return recording_frames
-```
-
-```{python}
 #| code-fold: true
 #| label: fig-patch-examples
 #| fig-column: page-inset-right
 #| fig-cap: Two example patches sub-sampled from the same recording as above in @fig-example-image, showing evolution of calcium activity over time relative to bath application of baclofen at $t = 0$. (A small Gaussian smoothing kernel in space and time has been applied here, to aid visualization.)
+
+from oa_pub.analysis import (
+    get_movie,
+    movie_times,
+    #
+    N_PATCHES_Y, N_PATCHES_X,
+)
+
 # Snag a convenient smoother for image preprocessing
 from scipy.ndimage import gaussian_filter
 
-## Constants for DINOv3
-N_PATCHES_Y = 14
-N_PATCHES_X = 14
 
-## Data hyperparameters
-test_patches = [
+## Demo example parameters
+
+FIRST_MOVIE_ID = 'd22f6a65-b3e2-46c2-ba5c-551920af1fe3'
+"Microscope-supplied UUID of the demo movie to show"
+
+DEMO_PATCHES = [
     (10, 12),
     (3, 7),
 ]
 "Indices (vertical, horizontal) of the demo patches to show"
 
-first_movie_id = 'd22f6a65-b3e2-46c2-ba5c-551920af1fe3'
-"Microscope-supplied UUID of the demo movie to show"
+IDX_FRAMES_COMPARE = (250, 350, 450, 550, 650, 750)
+"Indices of time-slices to display for patch snapshot figure"
+
+DEMO_PATCH_IMAGE_SMOOTHING_KERNEL = (3., 0.6, 0.6)
+"S.D. of gaussian smoothing kernel used for visualization (t, y, x)"
+
+#
+
+n_patches = len( DEMO_PATCHES )
+n_frame_compare = len( IDX_FRAMES_COMPARE )
+
+
+## Figure parameters
+
+PATCH_CMAX = 110
+"Maximum intensity value for patch snapshot figure"
+
 
 ##
 
-movie_frames = _get_movie( first_movie_id, verbose = False )
+first_movie_frames = get_movie( FIRST_MOVIE_ID, verbose = DEV )
+first_movie_times, movie_dt = movie_times( first_movie_frames )
 
-first_image = movie_frames[0].image[0]
+# The current `OpenAstrocytes` data architecture has imaging channels in the
+# first axis; we're refactoring the frame schemas to make channel contents
+# explicit now that lenses easily handle conversion. Channel 0 here is GCaMP.
+# => see https://github.com/forecast-bio/open-astrocytes/issues/12
+first_frame = first_movie_frames[0]
+first_image = first_frame.image[0]
+
+#
 patch_size_y = first_image.shape[0] / N_PATCHES_Y
 patch_size_x = first_image.shape[1] / N_PATCHES_X
 
 test_patch_frames = []
-for cur_i, cur_j in test_patches:
+for cur_i, cur_j in DEMO_PATCHES:
     patch_idx_y = ( int( np.floor( patch_size_y * cur_i ) ),
                     int( np.ceil( patch_size_y * (cur_i + 1) ) ) )
     patch_idx_x = ( int( np.floor( patch_size_y * cur_j ) ),
@@ -310,28 +306,15 @@ for cur_i, cur_j in test_patches:
     test_patch_frames.append(
         np.array( [ 
             frame.image[0][patch_idx_y[0]:patch_idx_y[1], :][:, patch_idx_x[0]:patch_idx_x[1]]
-            for frame in movie_frames
+            for frame in first_movie_frames
         ] )
     )
 
 test_patch_frames_filtered = [
-    gaussian_filter( fs, sigma = (3., 0.6, 0.6) )
+    gaussian_filter( fs, sigma = DEMO_PATCH_IMAGE_SMOOTHING_KERNEL )
     for fs in test_patch_frames
 ]
 
-## Figure parameters
-
-patch_cmax = 110
-"Maximum intensity value for patch snapshot figure"
-
-i_frame_compare = (250, 350, 450, 550, 650, 750)
-"Indices of time-slices to display for patch snapshot figure"
-
-#
-
-dt = movie_frames[3].t
-n_patches = len( test_patch_frames_filtered )
-n_frame_compare = len( i_frame_compare )
 
 ##
 
@@ -343,46 +326,66 @@ with HouseStyle() as s:
     )
 
     for i_patch in range( n_patches ):
-
         cur_patch_frames = test_patch_frames_filtered[i_patch]
 
         for i_t in range( n_frame_compare ):
+            ax = axs[i_patch, i_t]
+            cur_image = cur_patch_frames[IDX_FRAMES_COMPARE[i_t]]
 
-            axs[i_patch, i_t].imshow(
-                cur_patch_frames[i_frame_compare[i_t], :, :],
-                #
-                clim = (0, patch_cmax),
+            ax.imshow( cur_image,
+                clim = (0, PATCH_CMAX),
                 cmap = 'afmhot',
             )
 
             if i_patch == 0:
-                t_val = i_frame_compare[i_t] * dt - t_intervene
-                axs[i_patch, i_t].set_title( f'{t_val:+0.0f}s', fontsize = 12 )
-
-            if i_patch == (n_patches - 1) and i_t == 0:
-                axs[i_patch, i_t].tick_params( axis = 'x', length = 3 )
-                axs[i_patch, i_t].set_xticks( [-0.5, patch_size_x+0.5], ['0', f'{movie_frames[0].scale_x * patch_size_x:0.0f} µm'], ha = 'left' )
-            else:
-                axs[i_patch, i_t].tick_params( axis = 'x', length = 0 )
-                axs[i_patch, i_t].set_xticks( [-0.5, patch_size_x+0.5], ['', ''] )
+                # Show timings on top row
+                t_disp = first_movie_times[IDX_FRAMES_COMPARE[i_t]] - T_INTERVENE
+                ax.set_title( f'{t_disp:+0.1f}s',
+                    fontsize = 12,
+                )
             
-            axs[i_patch, i_t].set_yticks( [] )
-
             if i_t == 0:
+                # Show patch label on left column
                 axs[i_patch, i_t].set_ylabel( f'Patch {i_patch+1}' )
 
+            axs[i_patch, i_t].tick_params(
+                axis = 'x',
+                length = 0,
+            )
+            axs[i_patch, i_t].set_xticks( [-0.5, patch_size_x + 0.5], ['', ''] )
+            axs[i_patch, i_t].set_yticks( [] )
+
+    # Set up display ticks
+    ax_xticks = axs[-1, 0]
+    ax_xticks.tick_params(
+        axis = 'x',
+        length = 3,
+    )
+    ax_xticks.set_xticks(
+        [-0.5, patch_size_x + 0.5],
+        ['0', f'{first_frame.scale_x * patch_size_x:0.0f} µm'],
+        ha = 'left',
+    )
+
+    # Plot a nice lil' highlight behind the post-onset images
     fig.patches.extend( [
-        plt.Rectangle( (0.382, 0.0995), 0.53, 0.82,
+        plt.Rectangle( (0.382, 0.103), 0.53, 0.818,
+            figure = fig,
+            transform = fig.transFigure,
+            #
             fill = True,
+            linewidth = 0,
             color = 'k',
             alpha = 0.05,
             zorder = -1_000,
-            transform = fig.transFigure,
-            figure = fig,
         )
     ] )
 
-    plt.subplots_adjust( wspace = 0.04, hspace = 0. )
+    # Make the spacing nice and ~tight~.
+    plt.subplots_adjust(
+        wspace = 0.04,
+        hspace = 0.,
+    )
 ```
 
 These two patches are good illustrations of the "median" structure of this astrocyte two-photon imaging data. Both patches do exhibit *some* changes after compound application; in comparing, for example, the right four columns with the left two, a close inspection reveals some parts of the patch with evoked activations. But, these changes can be subtle to the unaided or non-specialist eye---particularly here with Patch 2, shown in the bottom row of panels, which we picked to show what a *very* subtle case looks like in raw form.
@@ -395,42 +398,77 @@ However, the large image model is remarkably able to pull out a good deal of str
 #| column: body-outset-right
 #| fig-cap: "For each of the two astrocyte network patches shown above in @fig-patch-examples, each trace shows the time-evolution of one representative embedding PC, relative to the onset of bath application of baclofen at *t* = 0. Time shown as seconds relative to compound entering the bath (shaded box); PC changes shown as multiples of the standard deviation of fluctuations in the pre-application baseline period. (*n.b.*: a 60s boxcar filter in time has been applied to each PC in order to compensate for intrinsic imaging noise, leading to blurring of activation edges.)"
 
+from oa_pub.analysis import (
+    baseline_normalize,
+    is_between,
+)
+
+# => see https://github.com/forecast-bio/open-astrocytes/issues/14
 from astrocytes._datasets._embeddings import (
     PatchEmbeddingTrace,
 )
 
+## Demo params
+DEMO_PCS = [
+    0,
+    1,
+    4,
+]
+
+PC_WINDOW = 84
+"The smoothing window used to postprocess the PCs was 84 frames (~60s)"
+
 ## Figure params
+DEMO_PC_COLORS = {
+    0: 'C0',
+    1: 'C2',
+    4: 'C3',
+}
 
-baseline_window = (-90, -30)
-plot_window = (-100, 240)
-panel_verbose = False
+BASELINE_WINDOW = (-90, -30)
+"The baseline window (in s relative to onset) used for normalization"
+PLOT_WINDOW = (-100, 240)
+"The window (in s relative to onset) to focus on for plotting"
 
-panel_yl = (-8, 13)
+CAUSAL_OFFSET_FRACTION = 0.25
+"The fraction of the full smoothing window width to use as a causal offset"
 
-#
+PANEL_YLIM = (-8, 13)
+PANEL_XTICKS = [-90, 0, 60, 120, 180, 240]
 
-wds_url = (
+# Migration of the PCA results to the full typed schema in `astrocytes` is
+# in-progress!
+# => see https://github.com/forecast-bio/open-astrocytes/issues/13
+PATCH_EMBEDDING_TRACE_WDS_URL = (
     'https://data.forecastbio.cloud'
     + '/testing/patch-pc-traces/bath-application/'
     + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
 )
-ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
+"URL of the atdata blob for the demo pre-computed `PatchEmbeddingTrace`s"
+
+
+##
+
+ds = atdata.Dataset[PatchEmbeddingTrace]( PATCH_EMBEDDING_TRACE_WDS_URL )
 
 it = ds.ordered( batch_size = None )
-if panel_verbose:
-    it = tqdm( it )
+if DEV: it = tqdm( it )
 
-#
 
-test_traces = [ None for _ in test_patches ]
+##
+
+test_traces = [ None for _ in DEMO_PATCHES ]
 for trace in it:
     try:
+        # Ensure traces have the needed metadata
         assert trace.metadata is not None and 'uuid' in trace.metadata
-        assert trace.metadata['uuid'] == first_movie_id
-        
-        for i_patch, (cur_i, cur_j) in enumerate( test_patches ):
+        assert trace.metadata['uuid'] == FIRST_MOVIE_ID
+
+        for i_patch, (cur_i, cur_j) in enumerate( DEMO_PATCHES ):
             if trace.i_patch == cur_i and trace.j_patch == cur_j:
                 test_traces[i_patch] = trace
+                if DEV:
+                    print( f'Snagged trace for {cur_i, cur_j}')
         
         should_finish = True
         for x in test_traces:
@@ -443,25 +481,12 @@ for trace in it:
         # Skip traces without needed metadata
         continue
 
-#
 
-def _baseline_normalize( ts, ys, window ):
-    filter_cur = (
-        (ts >= window[0])
-        & (ts < window[1])
-    )
-    mean = np.mean( ys[filter_cur] )
-    std = np.std( ys[filter_cur] )
-    return (ys - mean) / std, mean, std
+##
 
-#
-
-causal_offset = (84 * dt) / 4.
-"The smoothing window used to postprocess the PCs was 84 frames (~60s)"
-t_rel = test_traces[0].ts - t_intervene + causal_offset
+causal_offset = (PC_WINDOW * movie_dt) * CAUSAL_OFFSET_FRACTION
 
 with HouseStyle( grids = True ) as s:
-
     fig, axs = plt.subplots( n_patches, 1,
         figsize = (7, 7),
         sharex = True,
@@ -469,60 +494,51 @@ with HouseStyle( grids = True ) as s:
 
     for i_patch in range( n_patches ):
         ax = axs[i_patch]
+
         cur_trace = test_traces[i_patch]
+        t_rel = cur_trace.ts - T_INTERVENE + causal_offset
+        filter_plot = is_between( t_rel, PLOT_WINDOW )
 
-        values_0_norm, mean_0, std_0 = \
-            _baseline_normalize( t_rel, cur_trace.values[0, :], baseline_window )    
-        values_1_norm, mean_1, std_1 = \
-            _baseline_normalize( t_rel, cur_trace.values[1, :], baseline_window )
-        values_2_norm, mean_2, std_2 = \
-            _baseline_normalize( t_rel, cur_trace.values[4, :], baseline_window )
+        #
 
-        filter_plot = (
-            (t_rel >= plot_window[0])
-            & (t_rel < plot_window[1])
-        )
+        for i_seq, cur_pc in enumerate( DEMO_PCS ):
+            cur_color = DEMO_PC_COLORS[cur_pc]
+            
+            pc_values_norm, _, _ = baseline_normalize(
+                t_rel, cur_trace.values[cur_pc, :],
+                BASELINE_WINDOW
+            )
 
-        ax.plot( t_rel[filter_plot], values_0_norm[filter_plot],
-            'C0-',
-            label = 'PC 1',
-        )
-        ax.plot( t_rel[filter_plot], values_1_norm[filter_plot],
-            'C2-',
-            label = 'PC 2',
-        )
-        ax.plot( t_rel[filter_plot], values_2_norm[filter_plot],
-            'C3-',
-            label = 'PC 5',
-        )
+            ax.plot( t_rel[filter_plot], pc_values_norm[filter_plot],
+                f'{cur_color}-',
+                label = f'PC {cur_pc + 1}',
+            )
 
-        ax.fill_between( [0, plot_window[1]], panel_yl[0], panel_yl[1],
+        # Drug application overlay
+        ax.fill_between( [0, PLOT_WINDOW[1]], PANEL_YLIM[0], PANEL_YLIM[1],
             color = 'k',
             alpha = 0.05,
             linewidth = 0,
         )
 
-        ax.plot( plot_window, [0, 0],
+        # Baseline
+        ax.plot( PLOT_WINDOW, [0, 0],
             'k-',
             linewidth = 1,
         )
-        ax.plot( [plot_window[0], plot_window[0]], panel_yl,
+        # Left y-axis
+        ax.plot( [PLOT_WINDOW[0], PLOT_WINDOW[0]], PANEL_YLIM,
             'k-',
             linewidth = 1,
         )
 
-        ax.set_xticks( [-90, 0, 60, 120, 180, 240] )
-        ax.set_xlim( plot_window )
-        ax.set_ylim( panel_yl )
+        ax.set_xticks( PANEL_XTICKS )
+        ax.set_xlim( PLOT_WINDOW )
+        ax.set_ylim( PANEL_YLIM )
 
         ax.set_ylabel( f'Patch {i_patch + 1}' )
 
-        if i_patch == 0:
-            ax.text( 5, -6.5, '+ Drug',
-                va = 'center',
-                alpha = 0.5,
-            )
-        
+        # Bottom plot gets x label and legend
         if i_patch == (n_patches - 1):
             ax.set_xlabel( 'Time (s)' )
             plt.legend(
@@ -530,8 +546,14 @@ with HouseStyle( grids = True ) as s:
                 loc = 'upper left',
             )
 
-    plt.subplots_adjust( hspace = 0.08 )
+    # "+ Drug" text on one sample axis
+    axs[0].text( 5, -6.5, '+ Drug',
+        va = 'center',
+        alpha = 0.5,
+    )
 
+    # Make the spacing nice and ~tight~.
+    plt.subplots_adjust( hspace = 0.08 )
 ```
 
 #### Response heterogeneity across the imaging field
@@ -545,81 +567,33 @@ Indeed, when we look at the feature dynamics across all patches within the imagi
 #| code-fold: true
 #| label: fig-patch-example-grid-pc1
 #| column: screen-inset
-#| fig-cap: "Baseline-normalized changes in DINOv3 embedding PC1 features after bath application of baclofen for each of the 196 astrocyte network patches, derived from the same slice depicted above in @fig-example-image. The locations of the two representative patches shown in greater detail in @fig-patch-examples and @fig-patch-example-traces are highlighted in black boxes. Note the heterogeneity of responses across the imaging field, as well as the correspondence between portions of the network exhibiting PC1 activation and anatomical features of the local astrocyte network in @fig-example-image. \\newline Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation."
+#| fig-cap: "Baseline-normalized changes in DINOv3 embedding PC1 features after bath application of baclofen for each of the 196 astrocyte network patches, derived from the same slice depicted above in @fig-example-image. The locations of the two representative patches shown in greater detail in @fig-patch-examples and @fig-patch-example-traces are highlighted in black boxes. Note the heterogeneity of responses across the imaging field, as well as the correspondence between portions of the network exhibiting PC1 activation and anatomical features of the local astrocyte network in @fig-example-image. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation."
 
-def _get_movie_traces(
-            movie_uuid: str,
-            verbose: bool = False
-        ) -> list[list[PatchEmbeddingTrace]]:
-    "Return all patch embedding traces for a given recording"
+# For typing assists
+from matplotlib.axes import Axes
+from numpy.typing import NDArray
 
-    def _vprint( *args, **kwargs ):
-        if verbose: print( *args, **kwargs )
-
-    # TODO Change over to `atdata`'s new `wids` indexed
-    # WebDatasets for faster streaming  in demos
-    wds_url = (
-        'https://data.forecastbio.cloud'
-        + '/testing/patch-pc-traces/bath-application/'
-        + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
-    )
-    ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
-
-    started_movie = False
-    movie_traces: list[PatchEmbeddingTrace] = []
-
-    _vprint( 'Iterating traces...' )
-    for trace in ds.ordered( batch_size = None ):
-        try:
-            assert trace.metadata is not None
-            assert 'uuid' in trace.metadata
-
-            if trace.metadata['uuid'] == movie_uuid:
-                _vprint( 'Snagging correct movie...' )
-                started_movie = True
-                movie_traces.append( trace )
-
-            else:
-                if started_movie:
-                    # We've moved to a new movie uuid,
-                    # and so are finished here
-                    _vprint( 'Got it!' )
-                    break
-        except:
-            # Skip trace - no metadata
-            continue
-    
-    # Arrange result spatially
-    ret = [
-        [
-            None
-            for j in range( N_PATCHES_X )
-        ]
-        for i in range( N_PATCHES_Y )
-    ]
-
-    for trace in movie_traces:
-        ret[trace.i_patch][trace.j_patch] = trace
-
-    return ret
+from oa_pub.analysis import get_movie_traces
+from oa_pub.figures import plot_trace_grid
 
 
-##
+## Plot params
+GRIDS_XTICKS = [-90, 0, 240]
 
-# Plot params
-grids_ylim = (-12.5, 12.5)
+plot_pc = 0
+
+cur_grid_ylim = (-12.5, 12.5)
+cur_grid_yticks = [-10, 0, 10]
 
 
 ##
 
 # Collate full dataset
-first_movie_traces = _get_movie_traces(
-    first_movie_id,
-    verbose = False,
+first_movie_traces = get_movie_traces( FIRST_MOVIE_ID,
+    verbose = DEV,
 )
 
-# Do plot
-i_pc = 0
+# Do the grid plot itself
 
 with HouseStyle() as s:
 
@@ -627,53 +601,36 @@ with HouseStyle() as s:
         figsize = (16, 12),
     )
 
-    for i in range( N_PATCHES_Y ):
-        for j in range( N_PATCHES_X ):
-            ax = axs[i, j]
+    ts_grid = first_movie_traces[0][0].ts
+    ts_grid_rel = ts_grid - T_INTERVENE + causal_offset
 
-            trace = first_movie_traces[i][j]
-            ts_rel = trace.ts - t_intervene + causal_offset
+    filter_grid = is_between( ts_grid_rel, PLOT_WINDOW )
 
-            cur_values_norm, _, _ = \
-                _baseline_normalize( t_rel, trace.values[i_pc, :], baseline_window )  
+    # For each location in the grid, the y-values to plot are created by
+    # taking this specific PC's values from the structured data, normalizing
+    # them (the first return value of baseline_normalize), and then filtering for the
+    # time-window we want to plot
+    ys_grid = [
+        [
+            baseline_normalize(
+                t_rel, first_movie_traces[i][j].values[plot_pc, :],
+                BASELINE_WINDOW
+            )[0][filter_grid]
+            for j in range( N_PATCHES_Y )
+        ]
+        for i in range( N_PATCHES_X )
+    ]
 
-            filter_plot = (
-                (ts_rel >= plot_window[0])
-                & (ts_rel < plot_window[1])
-            )
-
-            ax.plot( ts_rel[filter_plot], cur_values_norm[filter_plot],
-                'C0-',
-                linewidth = 1.5,
-            )
-            
-            xl = ax.get_xlim()
-            ax.plot( xl, [0, 0], 'k-', linewidth = 1, zorder = -200 )
-            yl = grids_ylim
-            ax.fill_between( [0, xl[1]], yl[0], yl[1], color = 'k', alpha = 0.05, linewidth = 0, zorder = 100 )
-
-            if (i, j) in test_patches:
-                ax.fill_between( [xl[0], xl[1]], yl[0], yl[1], facecolor = 'none', edgecolor = f'k', alpha = 0.7, linewidth = 2., zorder = -300 )
-            
-            ax.set_xlim( xl )
-            ax.set_ylim( yl )
-
-            ax.set_yticks( [] )
-            ax.set_xticks( [] )
-    
-    for i in range( 1, N_PATCHES_X ):
-        axs[-1, i].set_xticks( [-90, 0, 240], ['', '', ''] )
-    axs[-1, 0].set_xticks( [-90, 0, 240], ['–90', '0', '240'],
-        fontsize = 11,
-        rotation = 90,
+    plot_trace_grid( axs, ts_grid_rel[filter_grid], ys_grid,
+        ylim = cur_grid_ylim,
+        xticks = GRIDS_XTICKS,
+        yticks = cur_grid_yticks,
+        color = f'{DEMO_PC_COLORS[plot_pc]}',
+        highlight = DEMO_PATCHES,
     )
 
-    axs[-1, 0].set_yticks( [-10, 0, 10], ['-10', '0', '10'],
-        fontsize = 11,
-    )
-
+    # Make spacing nice and ~tight~.
     fig.subplots_adjust( wspace = 0.1, hspace = 0.1 )
-
 ```
 
 ##### PC 2
@@ -683,60 +640,91 @@ with HouseStyle() as s:
 #| column: screen-inset
 #| fig-cap: As in @fig-patch-example-grid-pc1, but for embedding PC2 features. Note that while the distribution of loci that exhibit modulation post-application still respects the underlying anatomy of @fig-example-image, the spatial and temporal distribution is distinct from the changes seen for PC1. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation.
 
-# Do plot for PC 2
-i_pc = 1
-grids_ylim = (-18, 18)
+## Plot params
+plot_pc = 1
+
+cur_grid_ylim = (-18, 18)
+cur_grid_yticks = [-15, 0, 15]
+
+
+## ^ as above
 
 with HouseStyle() as s:
-
     fig, axs = plt.subplots( N_PATCHES_Y, N_PATCHES_X,
         figsize = (16, 12),
-        # sharex = True,
-        # sharey = True,
     )
 
-    for i in range( N_PATCHES_Y ):
-        for j in range( N_PATCHES_X ):
-            ax = axs[i, j]
-            trace = first_movie_traces[i][j]
-            ts_rel = trace.ts - t_intervene + causal_offset
+    ts_grid = first_movie_traces[0][0].ts
+    ts_grid_rel = ts_grid - T_INTERVENE + causal_offset
 
-            cur_values_norm, cur_mean, cur_std = \
-                _baseline_normalize( t_rel, trace.values[i_pc, :], baseline_window )  
+    filter_grid = is_between( ts_grid_rel, PLOT_WINDOW )
+    ys_grid = [
+        [
+            baseline_normalize(
+                t_rel, first_movie_traces[i][j].values[plot_pc, :],
+                BASELINE_WINDOW
+            )[0][filter_grid]
+            for j in range( N_PATCHES_Y )
+        ]
+        for i in range( N_PATCHES_X )
+    ]
 
-            filter_plot = (
-                (ts_rel >= plot_window[0])
-                & (ts_rel < plot_window[1])
-            )
+    plot_trace_grid( axs, ts_grid_rel[filter_grid], ys_grid,
+        ylim = cur_grid_ylim,
+        yticks = cur_grid_yticks,
+        color = f'{DEMO_PC_COLORS[plot_pc]}',
+        highlight = DEMO_PATCHES,
+    )
 
-            ax.plot( ts_rel[filter_plot], cur_values_norm[filter_plot], f'C2-', linewidth = 1.5, zorder = 200 )
-            
-            xl = ax.get_xlim()
-            ax.plot( xl, [0, 0], 'k-', linewidth = 1, zorder = -200 )
-            # yl = ax.get_ylim()
-            yl = grids_ylim
-            ax.fill_between( [0, xl[1]], yl[0], yl[1], color = 'k', alpha = 0.05, linewidth = 0, zorder = 100 )
-
-            if (i, j) in test_patches:
-                ax.fill_between( [xl[0], xl[1]], yl[0], yl[1], facecolor = 'none', edgecolor = f'k', alpha = 0.7, linewidth = 2., zorder = -300 )
-            
-            ax.set_xlim( xl )
-            ax.set_ylim( yl )
-
-            ax.set_yticks( [] )
-            ax.set_xticks( [] )
-    
-    for i in range( 1, N_PATCHES_X ):
-        axs[-1, i].set_xticks( [-90, 0, 240], ['', '', ''] )
-    axs[-1, 0].set_xticks( [-90, 0, 240], ['–90', '0', '240'], fontsize = 11, rotation = 90 )
-
-    for i in range( 0, N_PATCHES_Y - 1 ):
-        # axs[i, 0].set_yticks( [-10, 0, 10], ['', '', ''] )
-        pass
-    axs[-1, 0].set_yticks( [-15, 0, 15], ['-15', '0', '15'], fontsize = 11 )
-
+    # Make spacing nice and ~tight~.
     fig.subplots_adjust( wspace = 0.1, hspace = 0.1 )
+```
 
+##### PC 4
+```{python}
+#| code-fold: true
+#| label: fig-patch-example-grid-pc4
+#| column: screen-inset
+#| fig-cap: As in @fig-patch-example-grid-pc2, but for embedding PC4 features. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation.
+
+## Plot params
+plot_pc = 4
+
+cur_grid_ylim = (-18, 18)
+cur_grid_yticks = [-15, 0, 15]
+
+
+## ^ as above
+
+with HouseStyle() as s:
+    fig, axs = plt.subplots( N_PATCHES_Y, N_PATCHES_X,
+        figsize = (16, 12),
+    )
+
+    ts_grid = first_movie_traces[0][0].ts
+    ts_grid_rel = ts_grid - T_INTERVENE + causal_offset
+
+    filter_grid = is_between( ts_grid_rel, PLOT_WINDOW )
+    ys_grid = [
+        [
+            baseline_normalize(
+                t_rel, first_movie_traces[i][j].values[plot_pc, :],
+                BASELINE_WINDOW
+            )[0][filter_grid]
+            for j in range( N_PATCHES_Y )
+        ]
+        for i in range( N_PATCHES_X )
+    ]
+
+    plot_trace_grid( axs, ts_grid_rel[filter_grid], ys_grid,
+        ylim = cur_grid_ylim,
+        yticks = cur_grid_yticks,
+        color = f'{DEMO_PC_COLORS[plot_pc]}',
+        highlight = DEMO_PATCHES,
+    )
+
+    # Make spacing nice and ~tight~.
+    fig.subplots_adjust( wspace = 0.1, hspace = 0.1 )
 ```
 
 :::
@@ -744,7 +732,7 @@ with HouseStyle() as s:
 Overall, we see that while the activity of individual astrocyte network patches may be evident-but-subtle to the eye, the large, generalist DINOv3 image model provides a quantitative view of robust changes in calcium imaging features after drug application---a view that captures both the many-dimensional richness of local changes, as well as the heterogeneity of those responses in individual segments of the astrocyte network across an individual cortical slice.
 
 #### Components of static anatomy and dynamic physiology in patch embeddings
-Because the original PCA we performed to determine the bath application-–specific subspace of DINOv3 patch embeddings was computed across the full dataset, the image feature variance optimized through PCA necessarily incorporated contributions from two distinct facets of the image structure:
+Because the original PCA we performed to determine the bath application--specific subspace of DINOv3 patch embeddings was computed across the full dataset, the image feature variance optimized through PCA necessarily incorporated contributions from two distinct facets of the image structure:
 
 1. the contribution from variations *across* the static astrocyte network anatomical architectures imaged within the various patches; and
 2. the physiological dynamics that unfold *within* a single patch.
@@ -752,74 +740,75 @@ Because the original PCA we performed to determine the bath application-–speci
 In order to appreciate the structure of these two distinct contributions within the PC subspace projections in the OpenAstrocytes bath application dataset, we can take a look at a handful of representative patches to visualize the way astrocyte network patches "dance" around PC-space over the course of an experimental session:
 
 ```{python}
-#| echo: false
-
-## Figure parameters
-
-pcs_show = (0, 1, 4)
-n_traces_show = 1_000
-window_3d = (0, 240)
-
-panel_verbose = False
-
-##
-
-# Collate data
-
-wds_url = (
-    'https://data.forecastbio.cloud/testing/patch-pc-traces/bath-application/'
-    + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
-)
-ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
-
-it = ds.shuffled( batch_size = None )
-if panel_verbose:
-    it = tqdm( it )
-
-#
-
-i_trace = 0
-trace_data_show = []
-trace_data_raw_show = []
-
-for trace in it:
-    ts_rel = trace.ts - t_intervene + causal_offset
-    filter_3d = (
-        (ts_rel >= window_3d[0])
-        & (ts_rel < window_3d[1])
-    )
-
-    cur_trace_pcs_post = []
-    for i_pc in pcs_show:
-        cur_vals_norm, _, _ = _baseline_normalize( t_rel, trace.values[i_pc, :], baseline_window )  
-        cur_trace_pcs_post.append( cur_vals_norm[filter_3d] )
-    
-    trace_data_show.append( np.array( cur_trace_pcs_post ) )
-    trace_data_raw_show.append( trace.values[pcs_show, :] )
-
-    i_trace += 1
-    if i_trace >= n_traces_show:
-        break
-    
-trace_data_show = np.array( trace_data_show )
-trace_data_raw_show = np.array( trace_data_raw_show )
-```
-
-```{python}
 #| code-fold: true
 #| label: fig-patch-3d-raw
 #| column: body-outset
-#| fig-cap: "Three-dimensional slice of patch embedding PCs for a random selection of 100 astrocyte network patches as they unfold in time; colors are randomly chosen for each individual patch's dynamics. Black dots indicate the embedding of the network patch when the applied compound enters the bath at *t* = 0; colored dots with black circles indicate the embedding at *t* = 4 min after application, with the colored line between the two dots depicting the embedding-space trajectory of the patch over the course of the recording. Grey lines indicate the PC-space origin. \\newline Among this ~1% subset of patches within the OpenAstrocytes bath application dataset, trajectories are generally separable, indicating contributions of overall differences in underlying astrocytic anatomy from patch to patch. As expected, a number of the patches are *relatively* unresponsive to the applied compound, with only a small degree of motion in embedding-space across the recording (wiggly lines). However, a subset of the patches show strong, directed deviations after compound application, indicating reflections of local physiological modulation in the patch's image statistics."
+#| fig-cap: "Three-dimensional slice of patch embedding PCs for a random selection of 100 astrocyte network patches as they unfold in time; colors are randomly chosen for each individual patch's dynamics. Black dots indicate the embedding of the network patch when the applied compound enters the bath at *t* = 0; colored dots with black circles indicate the embedding at *t* = 4 min after application, with the colored line between the two dots depicting the embedding-space trajectory of the patch over the course of the recording. Grey lines indicate the PC-space origin. Among this ~1% subset of patches within the OpenAstrocytes bath application dataset, trajectories are generally separable, indicating contributions of overall differences in underlying astrocytic anatomy from patch to patch. As expected, a number of the patches are *relatively* unresponsive to the applied compound, with only a small degree of motion in embedding-space across the recording (wiggly lines). However, a subset of the patches show strong, directed deviations after compound application, indicating reflections of local physiological modulation in the patch's image statistics."
+
+from oa_pub.analysis import (
+    is_between,
+)
+from oa_pub.figures import (
+    plot_trajectory_3d,
+)
+
+
 ## Figure parameters
-random_seed = 89
-n_traces_show_raw = 100
+DEMO_PCS_3D = [
+    0,
+    1,
+    4
+]
+
+N_TRACES_SAMPLE_3D = 300
+"Number of samples to draw from the remote dataset for 3D plots"
+N_TRACES_SHOW_3D = 100
+"Number of samples to pull from those downloaded for including in plots"
+
+PLOT_WINDOW_3D = (0, 240)
+
 
 ##
 
-rng = np.random.default_rng( random_seed )
-traces_show_raw = rng.permutation( n_traces_show )[:n_traces_show_raw]
+# Preprocess shuffled subset of traces
+
+dataset = atdata.Dataset[PatchEmbeddingTrace]( PATCH_EMBEDDING_TRACE_WDS_URL )
+
+# TODO The shuffling mechanism in WebDataset inside this routine means that we
+# can't avoid nondeterminism in the data streamed in here, leading to intrinsic
+# nondeterminism in the output for this pub; this may be avoided in a future
+# `atdata` release supporting `wids` for indexed streaming.
+# => see https://github.com/foundation-ac/atdata/issues/32
+it = dataset.shuffled( batch_size = None )
+if DEV: it = tqdm( it )
+
+i_trace_sample = 0
+traces_3d_raw = []
+traces_3d_norm = []
+
+for i_trace_sample, trace in zip( range( N_TRACES_SAMPLE_3D ), it ):
+
+    ts_rel = trace.ts - T_INTERVENE + causal_offset
+    filter_3d = is_between( ts_rel, PLOT_WINDOW_3D )
+
+    cur_trace_norm = np.array( [
+        baseline_normalize(
+            ts_rel, trace.values[cur_pc, :],
+            BASELINE_WINDOW
+        )[0]
+        for cur_pc in DEMO_PCS_3D
+    ] )
+    
+    traces_3d_raw.append( trace.values[DEMO_PCS_3D, :][:, filter_3d]  )
+    traces_3d_norm.append( cur_trace_norm[:, filter_3d] )
+    
+traces_3d_raw = np.array( traces_3d_raw )
+traces_3d_norm = np.array( traces_3d_norm )
+
 
 ##
+
+idx_show = rng.permutation( N_TRACES_SAMPLE_3D )[:N_TRACES_SHOW_3D]
 
 with HouseStyle() as s:
     fig = plt.figure( figsize = (10, 10) )
@@ -829,53 +818,23 @@ with HouseStyle() as s:
 
     #
 
-    it = traces_show_raw
-    if panel_verbose:
-        it = tqdm( it )
+    it = idx_show
+    if DEV: it = tqdm( it )
 
     for i_trace in it:
-        # trace start
-        ax.scatter(
-            trace_data_raw_show[i_trace, 0, 0],
-            trace_data_raw_show[i_trace, 1, 0],
-            trace_data_raw_show[i_trace, 2, 0],
-            color = 'k',
-            s = 3
-        )
-        # trace end
-        ax.scatter(
-            trace_data_raw_show[i_trace, 0, -1],
-            trace_data_raw_show[i_trace, 1, -1],
-            trace_data_raw_show[i_trace, 2, -1],
-            facecolor = f'C{i_trace % 4}',
-            edgecolor = 'k',
-            linewidth = 0.5,
-            s = 8
-        )
-        # trajectory
-        ax.plot(
-            trace_data_raw_show[i_trace, 0, :],
-            trace_data_raw_show[i_trace, 1, :],
-            trace_data_raw_show[i_trace, 2, :],
-            f'C{i_trace % 4}-',
-            linewidth = 0.5,
-            alpha = 0.8,
+        plot_trajectory_3d( ax, traces_3d_raw[i_trace, :, :],
+            color = f'C{i_trace % 4}',
         )
 
     ax.set_xticks( [0], '' )
     ax.set_yticks( [0], '' )
     ax.set_zticks( [0], '' )
 
-    ax.set_xlabel( f'PC {pcs_show[0]+1}' )
-    ax.set_ylabel( f'PC {pcs_show[1]+1}' )
-    ax.set_zlabel( f'PC {pcs_show[2]+1}', rotation = 90 )
-
-    ax.set_xlabel( f'PC {pcs_show[0]+1}', rotation = -17 )
-    ax.set_ylabel( f'PC {pcs_show[1]+1}', rotation = 43 )
-    ax.set_zlabel( f'PC {pcs_show[2]+1}', rotation = 90 )
+    ax.set_xlabel( f'PC {DEMO_PCS_3D[0]+1}', rotation = -17 )
+    ax.set_ylabel( f'PC {DEMO_PCS_3D[1]+1}', rotation = 48 )
+    ax.set_zlabel( f'PC {DEMO_PCS_3D[2]+1}', rotation = 90 )
     
-    ax.set_box_aspect((1, 1, 1.1), zoom=0.92)
-
+    ax.set_box_aspect( (1, 1, 1.1), zoom = 0.92 )
 ```
 
 As expected, the largest contributor to the heterogeneity of individual frames' latent embeddings appears to come from the differences in *anatomical* structure---that is, from the regularities of the frames' image content arising from the difference in the shape of the cells within the specific patch---as opposed to *physiologic* changes within a static anatomical architecture. We see this in the distinctive separation of the trajectories of individual patches within embedding-space: while the positions of individual patches do change over time across the recording, these dynamic changes tend to be notably smaller relative to the separation *between* full patch trajectories.
@@ -886,48 +845,23 @@ However, quite interestingly, those dynamic deflections do *also* appear to poss
 #| code-fold: true
 #| label: fig-patch-3d-norm
 #| column: body-outset
-#| fig-cap: "Embeddings of the same patches from @fig-patch-3d-raw, but normalized to the fluctuations of each patch within the baseline period before application of pharmacology. Scale shown as multiples of the per-patch baseline standard deviation for each PC. \\newline This view highlights that there are a number of patches that are relatively unresponsive to applied pharmacology and remain relatively close to the origin (possibly owing, for example, to heterogeneity in calcium sensor expression)---and at the same time, a number of patches that exhibit extremely large (~50$\\sigma$!) excursions."
+#| fig-cap: "Embeddings of the same patches from @fig-patch-3d-raw, but normalized to the fluctuations of each patch within the baseline period before application of pharmacology. Scale shown as multiples of the per-patch baseline standard deviation for each PC. This view highlights that there are a number of patches that are relatively unresponsive to applied pharmacology and remain relatively close to the origin (possibly owing, for example, to heterogeneity in calcium sensor expression)---and at the same time, a number of patches that exhibit extremely large (~50$\\sigma$!) excursions."
 
 with HouseStyle() as s:
     fig = plt.figure( figsize = (10, 10) )
     ax = fig.add_subplot( projection = '3d' )
     ax.view_init( elev = 20 )
 
-    # for i_trace in tqdm( traces_show_raw ):
-    for i_trace in traces_show_raw:
-        # start
-        ax.scatter(
-            trace_data_show[i_trace, 0, 0],
-            trace_data_show[i_trace, 1, 0],
-            trace_data_show[i_trace, 2, 0],
-            color = 'k',
-            s = 3,
-        )
-        # end
-        ax.scatter(
-            trace_data_show[i_trace, 0, -1],
-            trace_data_show[i_trace, 1, -1],
-            trace_data_show[i_trace, 2, -1],
-            facecolor = f'C{i_trace % 4}',
-            edgecolor = 'k',
-            linewidth = 0.5,
-            s = 8,
-        )
-        # trajectory
-        ax.plot(
-            trace_data_show[i_trace, 0, :],
-            trace_data_show[i_trace, 1, :],
-            trace_data_show[i_trace, 2, :],
-            f'C{i_trace % 4}-',
-            linewidth = 0.5,
-            alpha = 0.8,
+    for i_trace in idx_show:
+        plot_trajectory_3d( ax, traces_3d_norm[i_trace, :, :],
+            color = f'C{i_trace % 4}',
         )
     
     ax.set_xlim( -32, 32 )
     ax.set_ylim( -32, 32 )
     ax.set_zlim( -12, 52 )
 
-    # `pyplot` 3d ticks are a bit too loose!
+    # `pyplot` 3d ticks are a bit too loose by default!
     ax.tick_params(
         axis = 'y',
         which = 'major',
@@ -946,11 +880,11 @@ with HouseStyle() as s:
         fontsize = 12,
     )
 
-    ax.set_xlabel( f'PC {pcs_show[0]+1}',
+    ax.set_xlabel( f'PC {DEMO_PCS_3D[0]+1}',
         rotation = -14 )
-    ax.set_ylabel( f'PC {pcs_show[1]+1}',
+    ax.set_ylabel( f'PC {DEMO_PCS_3D[1]+1}',
         rotation = 37 )
-    ax.set_zlabel( f'PC {pcs_show[2]+1}',
+    ax.set_zlabel( f'PC {DEMO_PCS_3D[2]+1}',
         rotation = 90 )
     
     ax.set_box_aspect( (1, 1, 1.1),
@@ -970,13 +904,18 @@ The amazing richness of these AI-generated embeddings' portrait of physiologic c
 To investigate the extent of these local differences, we can first look at one of the same representative patches we took a gander at in @fig-patch-examples, but this time, across multiple distinct chemical exposures:
 
 ```{python}
-#| echo: false
-comparison_movie_id = 'cb2ee929-6bf5-4742-b9a5-21675c183cf9'
-comparison_movie_frames = _get_movie( comparison_movie_id, verbose = False )
-```
+#| code-fold: true
+#| label: fig-patch-examples-compare
+#| fig-column: page-inset-right
+#| fig-cap: Example frames of patch 1 from @fig-patch-examples above, now showing evolution of calcium activity over time within the *same* patch relative to bath application of either baclofen (top row) or *t*-ACPD (bottom row). Note that, consistent with the findings from @cahill2024network, *t*-ACPD evokes a much larger response in this astrocyte patch. (A small Gaussian smoothing kernel in space and time has been applied here, to aid visualization.)
 
-```{python}
-#| echo: false
+from oa_pub.analysis import get_movie
+
+## Demo parameters
+COMPARISON_MOVIE_ID = 'cb2ee929-6bf5-4742-b9a5-21675c183cf9'
+
+
+## Plot parameters
 COMPOUND_COLORS = {
     'tacpd': 'C0',
     'baclofen': 'C3',
@@ -985,27 +924,34 @@ COMPOUND_CMAPS = {
     'tacpd': 'managua',
     'baclofen': 'managua_r',
 }
-```
+COMPOUND_DISPLAY = {
+    'tacpd': 't-ACPD',
+    'baclofen': 'baclofen',
+}
 
-```{python}
-#| code-fold: true
-#| label: fig-patch-examples-compare
-#| fig-column: page-inset-right
-#| fig-cap: Example frames of patch 1 from @fig-patch-examples above, now showing evolution of calcium activity over time within the *same* patch relative to bath application of either baclofen (top row) or *t*-ACPD (bottom row). Note that, consistent with the findings from @cahill2024network, *t*-ACPD evokes a much larger response in this astrocyte patch. (A small Gaussian smoothing kernel in space and time has been applied here, to aid visualization.)
+PATCH_CMAX_COMPARE = 70
 
-test_patch_compare = test_patches[0]
 
+##
+
+comparison_movie_frames = get_movie( COMPARISON_MOVIE_ID, verbose = DEV )
+comparison_movie_times, movie_dt = movie_times( comparison_movie_frames )
+
+demo_patch_compare = DEMO_PATCHES[0]
 movies_compare = [
-    first_movie_id,
-    comparison_movie_id,
+    FIRST_MOVIE_ID,
+    COMPARISON_MOVIE_ID,
 ]
 frame_blocks_compare = [
-    movie_frames,
+    first_movie_frames,
     comparison_movie_frames,
 ]
 
-test_patch_frames_compare = []
-cur_i, cur_j = test_patch_compare
+
+##
+
+demo_patch_frames_compare = []
+cur_i, cur_j = demo_patch_compare
 
 for cur_frames in frame_blocks_compare:
 
@@ -1014,28 +960,27 @@ for cur_frames in frame_blocks_compare:
     patch_idx_x = ( int( np.floor( patch_size_y * cur_j ) ),
                     int( np.ceil( patch_size_y * (cur_j + 1) ) ) )
 
-    test_patch_frames_compare.append(
-        np.array( [ 
-            frame.image[0][patch_idx_y[0]:patch_idx_y[1], :][:, patch_idx_x[0]:patch_idx_x[1]]
+    demo_patch_frames_compare.append(
+        np.array( [
+            # Slice calcium channel
+            frame.image[0]\
+                # Slice vertical patch
+                [patch_idx_y[0]:patch_idx_y[1], :]\
+                # Slice horizontal patch
+                [:, patch_idx_x[0]:patch_idx_x[1]]
+            
             for frame in cur_frames
         ] )
     )
 
-test_patch_frames_compare_filtered = [
-    gaussian_filter( fs, sigma = (3., 0.6, 0.6) )
-    for fs in test_patch_frames_compare
+demo_patch_frames_compare_filtered = [
+    gaussian_filter( fs, sigma = DEMO_PATCH_IMAGE_SMOOTHING_KERNEL )
+    for fs in demo_patch_frames_compare
 ]
 
-#
+n_series = len( demo_patch_frames_compare )
+n_frame_compare = len( IDX_FRAMES_COMPARE )
 
-dt = movie_frames[3].t
-t_intervene = 300
-
-cmax = 70
-i_frame_compare = (250, 350, 450, 550, 650, 750)
-
-n_series = len( test_patch_frames_compare )
-n_frame_compare = len( i_frame_compare )
 
 #
 
@@ -1047,40 +992,55 @@ with HouseStyle() as s:
     )
 
     for i_series in range( n_series ):
+        cur_patch_frames = demo_patch_frames_compare_filtered[i_series]
+        cur_exemplar = frame_blocks_compare[i_series][0]
 
-        cur_patch_frames = test_patch_frames_compare_filtered[i_series]
-        cur_compound = frame_blocks_compare[i_series][0].applied_compound
+        cur_compound = cur_exemplar.applied_compound
 
         for i_t in range( n_frame_compare ):
             ax = axs[i_series, i_t]
 
             ax.imshow(
-                cur_patch_frames[i_frame_compare[i_t], :, :],
+                cur_patch_frames[IDX_FRAMES_COMPARE[i_t], :, :],
                 #
-                clim = (-cmax, cmax),
+                # Go two-sided here to enable us to use a compatible diverging
+                # colormap for the two compounds
+                clim = (-PATCH_CMAX_COMPARE, PATCH_CMAX_COMPARE),
                 cmap = COMPOUND_CMAPS[cur_compound],
             )
 
             if i_series == 0:
-                t_val = i_frame_compare[i_t] * dt - t_intervene
-                ax.set_title( f'{t_val:+0.0f}s', fontsize = 12 )
+                t_disp = comparison_movie_times[IDX_FRAMES_COMPARE[i_t]] - T_INTERVENE
+                ax.set_title( f'{t_disp:+0.0f}s',
+                    fontsize = 12,
+                )
 
             if i_series == (n_patches - 1) and i_t == 0:
-                ax.tick_params( axis = 'x', length = 3 )
-                ax.set_xticks( [-0.5, patch_size_x+0.5], ['0', f'{movie_frames[0].scale_x * patch_size_x:0.0f} µm'], ha = 'left' )
+                ax.tick_params(
+                    axis = 'x',
+                    length = 3,
+                )
+                ax.set_xticks( [-0.5, patch_size_x+0.5], ['0', f'{cur_exemplar.scale_x * patch_size_x:0.0f} µm'],
+                    ha = 'left',
+                )
             else:
-                ax.tick_params( axis = 'x', length = 0 )
+                ax.tick_params(
+                    axis = 'x',
+                    length = 0,
+                )
                 ax.set_xticks( [-0.5, patch_size_x+0.5], ['', ''] )
             
             ax.set_yticks( [] )
 
             if i_t == 0:
-                ax.set_ylabel( f'{cur_compound}', color = COMPOUND_COLORS[cur_compound] )
-
+                ax.set_ylabel( f'{COMPOUND_DISPLAY[cur_compound]}',
+                    color = COMPOUND_COLORS[cur_compound]
+                )
 
     fig.patches.extend( [
-        plt.Rectangle( (0.382, 0.0895), 0.53, 0.82,
+        plt.Rectangle( (0.382, 0.103), 0.53, 0.818,
             fill = True,
+            linewidth = 0,
             color = 'k',
             alpha = 0.05,
             zorder = -1_000,
@@ -1090,7 +1050,6 @@ with HouseStyle() as s:
     ] )
 
     plt.subplots_adjust( wspace = 0.04, hspace = 0. )
-
 ```
 
 We see by eye that *t*-ACPD evokes a considerably larger response in this patch, and this is reflected in the patch embeddings: while in @fig-patch-example-traces above we were able to clearly distinguish the subtle modulations induced by the introduction of baclofen, when placed on the same scale (top row) as the changes induced in this same patch by *t*-ACPD (bottom row), in @fig-patch-example-traces-compare below, the difference is stark:
@@ -1106,6 +1065,7 @@ from tqdm import tqdm
 import atdata
 
 import astrocytes
+# => see https://github.com/forecast-bio/open-astrocytes/issues/14
 from astrocytes._datasets._embeddings import (
     PatchEmbeddingTrace,
 )
@@ -1113,48 +1073,43 @@ from astrocytes._datasets._embeddings import (
 #
 
 ## Plot params
-t_intervene = 300
-baseline_window = (-100, -15)
-plot_window = (-100, 240)
-
-panel_yl = (-6, 85)
+PANEL_YLIM = (-6, 85)
 
 #
 
-wds_url = (
-    'https://data.forecastbio.cloud/testing/patch-pc-traces/bath-application/'
-    + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
-)
-ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
+ds = atdata.Dataset[PatchEmbeddingTrace]( PATCH_EMBEDDING_TRACE_WDS_URL )
 
-test_traces_compare = [ None for _ in movies_compare ]
-# for trace in tqdm( ds.ordered( batch_size = None ) ):
-for trace in ds.ordered( batch_size = None ):
+
+it = ds.ordered( batch_size = None )
+if DEV: it = tqdm( it )
+
+demo_traces_compare = [ None for _ in movies_compare ]
+
+for trace in it:
+
     try:
         assert trace.metadata is not None and 'uuid' in trace.metadata
         assert trace.metadata['uuid'] in movies_compare
         
         i_movie = movies_compare.index( trace.metadata['uuid'] )
 
-        if trace.i_patch == test_patch_compare[0] and trace.j_patch == test_patch_compare[1]:
-            test_traces_compare[i_movie] = trace
-            # print( 'Caught', trace.metadata['uuid'] )
+        if (
+            trace.i_patch == demo_patch_compare[0]
+            and trace.j_patch == demo_patch_compare[1]
+        ):
+            demo_traces_compare[i_movie] = trace
         
         should_finish = True
-        for x in test_traces_compare:
+        for x in demo_traces_compare:
             if x is None:
                 should_finish = False
         if should_finish:
             break
 
     except:
-        # print( trace.metadata['uuid'], trace.i_patch, trace.j_patch )
         continue
 
 #
-
-causal_offset = (84 * dt) / 4.
-t_rel = test_traces[0].ts - t_intervene + (causal_offset)
 
 with HouseStyle( grids = True ) as s:
 
@@ -1166,154 +1121,132 @@ with HouseStyle( grids = True ) as s:
 
     for i_series in range( n_patches ):
         ax = axs[i_series]
-        cur_trace = test_traces_compare[i_series]
+
+        cur_trace = demo_traces_compare[i_series]
         cur_compound = frame_blocks_compare[i_series][0].applied_compound
+        t_rel = cur_trace.ts - T_INTERVENE + causal_offset
+        filter_plot = is_between( t_rel, PLOT_WINDOW )
 
-        values_0_norm, mean_0, std_0 = \
-            _baseline_normalize( t_rel, cur_trace.values[0, :], baseline_window )    
-        values_1_norm, mean_1, std_1 = \
-            _baseline_normalize( t_rel, cur_trace.values[1, :], baseline_window )
-        values_2_norm, mean_2, std_2 = \
-            _baseline_normalize( t_rel, cur_trace.values[4, :], baseline_window )
+        #
 
-        filter_plot = (
-            (t_rel >= plot_window[0])
-            & (t_rel < plot_window[1])
+        for i_seq, cur_pc in enumerate( DEMO_PCS ):
+            cur_color = DEMO_PC_COLORS[cur_pc]
+            
+            pc_values_norm, _, _ = baseline_normalize(
+                t_rel, cur_trace.values[cur_pc, :],
+                BASELINE_WINDOW
+            )
+
+            ax.plot( t_rel[filter_plot], pc_values_norm[filter_plot],
+                f'{cur_color}-',
+                label = f'PC {cur_pc + 1}',
+            )
+
+        # Drug application overlay
+        ax.fill_between( [0, PLOT_WINDOW[1]], PANEL_YLIM[0], PANEL_YLIM[1],
+            color = 'k',
+            alpha = 0.05,
+            linewidth = 0,
         )
 
-        ax.plot( t_rel[filter_plot], values_0_norm[filter_plot], 'C0-', label = 'PC 1' )
-        ax.plot( t_rel[filter_plot], values_1_norm[filter_plot], 'C2-', label = 'PC 2' )
-        ax.plot( t_rel[filter_plot], values_2_norm[filter_plot], 'C3-', label = 'PC 5' )
-        
-        yl = panel_yl
+        # Baseline
+        ax.plot( PLOT_WINDOW, [0, 0],
+            'k-',
+            linewidth = 1,
+        )
+        # Left y-axis
+        ax.plot( [PLOT_WINDOW[0], PLOT_WINDOW[0]], PANEL_YLIM,
+            'k-',
+            linewidth = 1,
+        )
 
-        ax.fill_between( [0, plot_window[1]], yl[0], yl[1], color = 'k', alpha = 0.05, linewidth = 0 )
+        ax.set_xticks( PANEL_XTICKS )
+        ax.set_xlim( PLOT_WINDOW )
+        ax.set_ylim( PANEL_YLIM )
 
-        ax.plot( plot_window, [0, 0], 'k-', linewidth = 1 )
-        ax.plot( [plot_window[0], plot_window[0]], yl, 'k-', linewidth = 1 )
+        ax.set_ylabel( f'{COMPOUND_DISPLAY[cur_compound]}',
+            color = COMPOUND_COLORS[cur_compound]
+        )
 
-        ax.set_xticks( [-90, 0, 60, 120, 180, 240] )
-        # ax.set_yticks( [0, 5, 10] )
-        ax.set_xlim( plot_window )
-        ax.set_ylim( yl )
-
-        ax.set_ylabel( f'{cur_compound}', color = COMPOUND_COLORS[cur_compound] )
-
+        # Bottom plot gets x label and legend
         if i_series == (n_patches - 1):
             ax.set_xlabel( 'Time (s)' )
-            # ax.set_ylabel( '∆ (baseline SD)' )
+            plt.legend(
+                fontsize = 12,
+                loc = 'upper left',
+            )
 
-            plt.legend( fontsize = 12, loc = 'upper left' )
-
-            ax.text( 5, 72.5, '+ Drug', alpha = 0.5 )
+        # Bottom plot also gets "+ Drug" label overlay
+        if i_series == (n_patches - 1):
+            ax.text( 5, 50, '+ Drug',
+                alpha = 0.5,
+            )
 
     fig.subplots_adjust( hspace = 0.05 )
-
 ```
 
 #### Consistent pharmacology-specific profiles
 The fact that these feature axes within patch embedding--space separate responses to the two compounds is not unique to this patch or this cortical slice: in fact, we can average across the responses in all patches in all recordings throughout the entire OpenAstrocytes bath application dataset, in order to view the unique profiles of dynamic responses to baclofen (red) and *t*-ACPD (blue), and quantify those responses' heterogeneity:
 
 ```{python}
-#| echo: false
+#| code-fold: true
+#| label: fig-patch-pcs-population
+#| column: body-outset
+#| fig-cap: Average changes in the first eight principal components of patch embeddings relative to application of baclofen (red) or *t*-ACPD (blue). Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation. Error corridors show population mean ± trace-wise bootstrapped 95% confidence interval of the mean.
 
-#
+from oa_pub.analysis import boot_stat
 
-from typing import (
-    Callable,
-)
 
-#
+## Data parameters
 
-def boot_sample_traces( Xs: NDArray, axis = 0 ) -> NDArray:
+MODULATION_MIN_CONCENTRATION = 50. #µM
+"""The minimum concentration (µM) of applied compound to include in PC
+modulation analyses
 
-    sample_idx = np.random.randint( Xs.shape[axis], size = (Xs.shape[axis]) )
-    return Xs[sample_idx, :]
+(This excludes recordings where there may have been little engagement, for
+demonstration purposes)
+"""
 
-def boot_traces( Xs: NDArray,
-            n: int = 200,
-            axis: int = 0,
-            verbose: bool = False
-        ) -> NDArray:
-    
-    ret = np.zeros( (n,) + Xs.shape )
-    it = tqdm( range( n ) ) if verbose else range( n )
+MODULATION_DEMO_PCS = list( range( 8 ) )
+n_pcs_show = len( MODULATION_DEMO_PCS )
 
-    for i in it:
-        ret[i] = boot_sample_traces( Xs, axis = axis )
-    return ret
 
-def boot_stat( Xs: NDArray, f: Callable[[NDArray], NDArray],
-            n: int = 200,
-            axis: int = 0,
-            verbose: bool = False,
-        ) -> NDArray:
+## Collate traces by compound
+from oa_pub.analysis import COMPOUND_ALIASES
 
-    it = tqdm( range( n ) ) if verbose else range( n )
-    
-    boot_stats = np.array( [ f( boot_sample_traces( Xs, axis = axis ) )
-                             for i in it ] )
-    return boot_stats
-```
-
-```{python}
-#| echo: false
-
-#
-
-wds_url = (
-    'https://data.forecastbio.cloud/testing/patch-pc-traces/bath-application/'
-    + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
-)
-ds = atdata.Dataset[PatchEmbeddingTrace]( wds_url )
-
-#
-
-compound_aliases = {
-    'baclofen': [
-        'baclofen',
-        'bacloffen',
-    ],
-    'tacpd': [
-        'tacpd',
-    ],
-}
+ds = atdata.Dataset[PatchEmbeddingTrace]( PATCH_EMBEDDING_TRACE_WDS_URL )
 
 compound_traces: dict[str, list[PatchEmbeddingTrace]] = {
     c: []
-    for c in compound_aliases.keys()
+    for c in COMPOUND_DISPLAY.keys()
 }
 
-MIN_CONCENTRATION = 50. #uM
+it = ds.ordered( batch_size = None )
+if DEV: it = tqdm( it )
 
-# for trace in tqdm( ds.ordered( batch_size = None ) ):
-for trace in ds.ordered( batch_size = None ):
+for trace in it:
+
     try:
         assert trace.metadata is not None, \
             'No metadata for trace'
         assert 'compound' in trace.metadata and 'concentration' in trace.metadata, \
             'Missing metadata keys for trace'
         
-        if trace.metadata['concentration'] >= MIN_CONCENTRATION:
-            for k, vs in compound_aliases.items():
+        if trace.metadata['concentration'] >= MODULATION_MIN_CONCENTRATION:
+            for k, vs in COMPOUND_ALIASES.items():
                 if trace.metadata['compound'].lower() in vs:
                     compound_traces[k].append( trace )
 
     except Exception as e:
-        # print( 'bad sample trace' )
         continue
 
-```
 
-```{python}
-#| code-fold: true
-#| label: fig-patch-pcs-population
-#| column: body-outset
-#| fig-cap: Average changes in the first eight principal components of patch embeddings relative to application of baclofen (red) or *t*-ACPD (blue). \\newline Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation. Error corridors show population mean ± trace-wise bootstrapped 95% confidence interval of the mean.
+## Plot
 
-pcs_show_testing = (0, 1, 2, 3, 4, 5, 6, 7)
+exemplar_trace = compound_traces['baclofen'][0]
+ts_rel = exemplar_trace.ts - T_INTERVENE + causal_offset
 
-n_pcs_show = len( pcs_show_testing )
+filter_plot = is_between( ts_rel, PLOT_WINDOW )
 
 with HouseStyle( grids = True ) as s:
 
@@ -1322,44 +1255,36 @@ with HouseStyle( grids = True ) as s:
         sharex = True,
     )
 
-    for i_seq, i_pc in enumerate( pcs_show_testing ):
+    for i_seq, i_pc in enumerate( MODULATION_DEMO_PCS ):
         i_ax = i_seq // 2
         j_ax = i_seq % 2
         ax = axs[i_ax, j_ax]
 
-        ts_rel = trace.ts - t_intervene + causal_offset
-        filter_baseline = (
-            (ts_rel >= baseline_window[0])
-            & (ts_rel < baseline_window[1])
-        )
-
         raw_values = {
             c: np.array( [
-                _baseline_normalize(
-                    ts_rel,
-                    trace.values[i_pc, :],
-                    baseline_window,
+                baseline_normalize( ts_rel, trace.values[i_pc, :],
+                    BASELINE_WINDOW,
                 )[0]
                 for trace in traces
             ] )
             for c, traces in compound_traces.items()
         }
 
-        middle_trace = {
-            c: np.mean( vs, axis = 0 )
+        summary_stat = lambda xs: np.mean( xs, axis = 0 )
+
+        middle_vals = {
+            c: summary_stat( vs )
             for c, vs in raw_values.items()
         }
 
-        # print( { c: vs.shape for c, vs in raw_values.items() } )
-
         middle_boots = {
-            c: boot_stat( vs, lambda x: np.mean( x, axis = 0 ), axis = 0,
+            c: boot_stat( vs, summary_stat,
                 n = 200,
-                verbose = False,
+                axis = 0,
+                rng = rng,
             )
             for c, vs in raw_values.items()
         }
-        # print( { c: vs.shape for c, vs in middle_boots.items() } )
         middle_low = {
             c: np.quantile( vs, 0.025, axis = 0 )
             for c, vs in middle_boots.items()
@@ -1369,31 +1294,30 @@ with HouseStyle( grids = True ) as s:
             for c, vs in middle_boots.items()
         }
 
-        filter_plot = (
-            (ts_rel >= plot_window[0])
-            & (ts_rel < plot_window[1])
-        )
-
         #
 
-        for c in middle_trace.keys():
-            ax.plot( ts_rel[filter_plot], middle_trace[c][filter_plot], '-',
-                color = COMPOUND_COLORS[c]
+        for cur_compound, cur_middle in middle_vals.items():
+
+            ax.plot( ts_rel[filter_plot], cur_middle[filter_plot], '-',
+                color = COMPOUND_COLORS[cur_compound],
+                label = COMPOUND_DISPLAY[cur_compound],
             )
-            ax.fill_between(
-                ts_rel[filter_plot],
-                middle_low[c][filter_plot],
-                middle_high[c][filter_plot],
-                color = COMPOUND_COLORS[c],
+
+            cur_low = middle_low[cur_compound]
+            cur_high = middle_high[cur_compound]
+            ax.fill_between( ts_rel[filter_plot], cur_low[filter_plot], cur_high[filter_plot],
+                #
+                color = COMPOUND_COLORS[cur_compound],
                 alpha = 0.2,
                 linewidth = 0.5,
             )
 
-        xl = plot_window
+        xl = PLOT_WINDOW
         yl = ax.get_ylim()
-        # yl = (-6, 6)
 
-        ax.plot( xl, [0, 0], 'k-', linewidth = 1 )
+        ax.plot( xl, [0, 0], 'k-',
+            linewidth = 1,
+        )
 
         ax.fill_between( [0, xl[1]], yl[0], yl[1],
             color = 'k',
@@ -1401,23 +1325,29 @@ with HouseStyle( grids = True ) as s:
             linewidth = 0,
         )
 
+        ax.plot( [xl[0], xl[0]], yl, 'k-',
+            linewidth = 1,
+        )
+
         ax.set_xlim( xl )
         ax.set_ylim( yl )
 
         ax.set_ylabel( f'PC {i_pc + 1}' )
-        ax.set_xticks( [-90, 0, 60, 120, 180, 240] )
+        ax.set_xticks( PANEL_XTICKS )
 
-        if j_ax == 0 and i_ax == len( pcs_show_testing ) // 2:
+        if j_ax == 0 and i_ax == len( MODULATION_DEMO_PCS ) // 2:
             ax.set_xlabel( 'Time (s)' )
         
         if j_ax == 0 and i_ax == 0:
+            ax.legend(
+                fontsize = 12,
+            )
             ax.text( 5, -1.5, '+ Drug',
                 alpha = 0.5,
                 va = 'center',
             )
     
     fig.subplots_adjust( wspace = 0.23, hspace = 0.09 )
-
 ```
 
 Amazingly, we see that these feature axes capture *consistent* differences in the evoked imaging features between the two compounds, across a large array of different individual mice, slices, and experiments. This suggests that the image feature axes modulated by applied pharmacology are not arbitrary divisions in image-space, but are instead capturing regularities in the ways that these compounds' impacts on astrocytes consistently change intracellular calcium computations in response.[This concords with our previous work, in which we found one specific image feature of astrocyte calcium dynamics---the extent to which individual calcium events *propagate* in space---defined a subset of calcium excitations carrying its own separable information content about a distinct chemical exposure, in that case to extracellular glutamate [@cahill2024network].]{.aside}
@@ -1428,137 +1358,203 @@ The question then arises: *Are these consistent differences robust enough to **d
 Evaluating this single-patch compound decoding performance across time reveals some interesting patterns:
 
 ```{python}
-#| echo: false
+#| code-fold: true
+#| label: fig-decoding
+#| column: body-outset-right
+#| fig-cap: Accuracy of classifying applied pharmacology (baclofen *vs.* *t*-ACPD) from embeddings of a single astrocyte network patch using SVC, as a function of time after application of the compound. Colored bands indicate bootstrapped 99% confidence interval of accuracy across cross-validation replicates (each using a random 80:20 train:test split). Each trace color corresponds to a distinct number of PCs included in the decoder. The black trace indicates a null condition in which the compound labels were permuted at each time point, but decoding was performed otherwise in the same manner---*i.e.*, the random chance level for decoding performance.
+
+from oa_pub.analysis import is_between
 
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 
-#
 
-compound_labels = {
+## Decoding parameters
+
+COMPOUND_LABELS_DECODE = {
     'baclofen': 0,
     'tacpd': 1,
 }
+"Assign an integer class label to each compound"
 
-window_decode = (-60, 240)
+COMPUTE_WINDOW_DECODE = (-60, 240)
+"Time window across which to slide the decoding problem"
 
-#
+SUBSAMPLING_DECODE = 20
+"Decoding at each frame would be time-prohibitive; this gives a downscaling factor"
 
-ts_rel = compound_traces['baclofen'][0].ts - t_intervene + causal_offset
-filter_decode = (
-    (ts_rel >= window_decode[0])
-    & (ts_rel < window_decode[1])
-)
+N_PC_DECODE_VARIANTS = [
+    4,
+    8,
+    12,
+    16,
+]
+"Test decoding based off the top k PCs, for each k in this list"
 
-idx_iter = np.where( filter_decode )[0]
-idx_iter = idx_iter[::20]
+N_CV_DECODE = 20
+"Number of distinct cross-validation splits to use in estimating performance"
 
-n_pc_try = [4, 8, 12, 16]
-n_cv = 20
+FRAC_TRAIN_DECODE = 0.8
+"Fraction of data to use for training in each CV split"
 
-acc_cv = [ np.zeros( (idx_iter.shape[0], n_cv) )
-           for _ in n_pc_try ]
-acc_cv_shuffle = np.zeros( (idx_iter.shape[0], n_cv) )
 
-for i_pcs_seq, n_pc_use in enumerate( n_pc_try ):
+## Plot parameters
 
-    # for i_t_seq, i_t in tqdm( enumerate( idx_iter ), total = idx_iter.shape[0] ):
-    for i_t_seq, i_t in enumerate( idx_iter ):
+PANEL_YLIM = (0.37, 1.03)
+DECODE_XTICKS = [-60, 0, 60, 120, 180, 240]
 
+
+##
+
+exemplar_trace = compound_traces['baclofen'][0]
+ts_rel = exemplar_trace.ts - T_INTERVENE + causal_offset
+filter_decode = is_between( ts_rel, COMPUTE_WINDOW_DECODE )
+idx_t_decode = np.where( filter_decode )[0]
+# In order to speed computation, reduce the number of indices we decode on
+idx_t_decode = idx_t_decode[::SUBSAMPLING_DECODE]
+
+
+##
+
+acc_cv = [ np.zeros( (idx_t_decode.shape[0], N_CV_DECODE) )
+           for _ in N_PC_DECODE_VARIANTS ]
+acc_cv_shuffled = np.zeros( (idx_t_decode.shape[0], N_CV_DECODE) )
+
+for i_pcs_seq, n_pc_decode in enumerate( N_PC_DECODE_VARIANTS ):
+
+    it = enumerate( idx_t_decode )
+    if DEV: it = tqdm( it, total = idx_t_decode.shape[0] )
+
+    for i_t_seq, i_t in it:
         features_cur = []
         labels_cur = []
-        for c, traces in compound_traces.items():
-            for trace in traces:
-                features_cur.append( trace.values[:n_pc_use, i_t] )
-                labels_cur.append( compound_labels[c] )
+
+        # Form current feature and label arrays
+        for cur_compound, cur_traces in compound_traces.items():
+            for trace in cur_traces:
+                features_cur.append( trace.values[:n_pc_decode, i_t] )
+                labels_cur.append( COMPOUND_LABELS_DECODE[cur_compound] )
         features_cur = np.array( features_cur )
         labels_cur = np.array( labels_cur )
 
-        n_train = int( 0.8 * labels_cur.shape[0] )
+        # Determine n's in train:test split
+        n_train = int( FRAC_TRAIN_DECODE * labels_cur.shape[0] )
         n_test = labels_cur.shape[0] - n_train
         filter_train = np.r_[np.ones( (n_train,) ), np.zeros( (n_test,) )]
 
-        for i_cv in range( n_cv ):
+        for i_cv in range( N_CV_DECODE ):
+
+            # Pick a random training set for this split
             filter_train = np.random.permutation( filter_train ).astype( bool )
+            # The test set is whatever we don't train on
             filter_test = ~filter_train
 
             classifier = SVC( gamma = 'scale' )
+            # Left to the reader as an exercise!
             # classifier = LogisticRegression()
 
             classifier.fit( features_cur[filter_train, :], labels_cur[filter_train] )
-            labels_hat = classifier.predict( features_cur[filter_test, :] )
-            acc_cur = np.sum( labels_hat == labels_cur[filter_test] ) / np.sum( filter_test )
+            
+            labels_test = labels_cur[filter_test]
+            labels_test_hat = classifier.predict( features_cur[filter_test, :] )
+            acc_cur = (
+                np.sum( labels_test_hat == labels_test )
+                / labels_test.shape[0]
+            )
             acc_cv[i_pcs_seq][i_t_seq, i_cv] = acc_cur
         
         #
 
-        # Most favorable possible comparison for perm
-        if n_pc_use == n_pc_try[-1]:
+        # Most favorable possible comparison for perms. is most PCs
+        if n_pc_decode == max( N_PC_DECODE_VARIANTS ):
+            # Do the permuted form with this number of PCs
 
-            labels_cur_shuffled = np.random.permutation( labels_cur )
+            for i_cv in range( N_CV_DECODE ):
 
-            n_train = int( 0.8 * labels_cur_shuffled.shape[0] )
-            n_test = labels_cur_shuffled.shape[0] - n_train
-            filter_train = np.r_[np.ones( (n_train,) ), np.zeros( (n_test,) )]
+                # Build the permuted labels
+                labels_cur_shuffled = np.random.permutation( labels_cur )
 
-            for i_cv in range( n_cv ):
+                # Build the train:test split for the permuted iteration
+                n_train = int( FRAC_TRAIN_DECODE * labels_cur_shuffled.shape[0] )
+                n_test = labels_cur_shuffled.shape[0] - n_train
+                filter_train = np.r_[np.ones( (n_train,) ), np.zeros( (n_test,) )]
                 filter_train = np.random.permutation( filter_train ).astype( bool )
                 filter_test = ~filter_train
 
-                svc = SVC( gamma = 'auto' )
-                svc.fit( features_cur[filter_train, :], labels_cur_shuffled[filter_train] )
-                labels_hat = svc.predict( features_cur[filter_test, :] )
-                acc_cur = np.sum( labels_hat == labels_cur_shuffled[filter_test] ) / np.sum( filter_test )
-                acc_cv_shuffle[i_t_seq, i_cv] = acc_cur
-```
+                classifier_shuffled = SVC( gamma = 'scale' )
+                # classifier_shuffled = LogisticRegression()
 
-```{python}
-#| code-fold: true
-#| label: fig-decoding
-#| column: body-outset-right
-#| fig-cap: Accuracy of classifying applied pharmacology (baclofen *vs.* *t*-ACPD) from embeddings of a single astrocyte network patch, as a function of time after application of the compound. Colored bands indicate bootstrapped confidence interval of accuracy across cross-validation replicates. Each trace color corresponds to a distinct number of PCs included in the decoder. The black trace indicates a null condition in which the compound labels were permuted at each time point, but decoding was performed otherwise in the same manner---*i.e.*, the random chance level for decoding performance.
-#| 
+                classifier_shuffled.fit(
+                    features_cur[filter_train, :],
+                    labels_cur_shuffled[filter_train]
+                )
+
+                labels_test_shuffled = labels_cur_shuffled[filter_test]
+                labels_test_hat_shuffled = classifier_shuffled.predict( features_cur[filter_test, :] )
+                acc_cur = (
+                    np.sum( labels_test_hat_shuffled == labels_test_shuffled )
+                    / labels_test_shuffled.shape[0]
+                )
+                acc_cv_shuffled[i_t_seq, i_cv] = acc_cur
+
+
+##
+
+summary_stat = lambda xs: np.mean( xs, axis = 0 )
+
 with HouseStyle( grids = True ) as s:
-    fig, ax = plt.subplots( figsize = (8, 5) )
+    fig, ax = plt.subplots(
+        figsize = (8, 5),
+    )
 
-    #
+    for i_seq, (n_pc_cur, acc_cv_cur) in enumerate(
+                zip( N_PC_DECODE_VARIANTS, acc_cv )
+            ):
 
-    for i_seq, (n_pc_cur, acc_cv_cur) in enumerate( zip( n_pc_try, acc_cv ) ):
-        middle_trace = np.mean( acc_cv_cur.T, axis = 0 )
-        middle_boots = boot_stat( acc_cv_cur.T, lambda x: np.mean( x, axis = 0 ), axis = 0,
+        middle_trace = summary_stat( acc_cv_cur.T )
+
+        middle_boots = boot_stat( acc_cv_cur.T, summary_stat,
+            axis = 0,
             n = 1_000,
-            verbose = False
+            rng = rng,
         )
         middle_low = np.quantile( middle_boots, 0.005, axis = 0 )
         middle_high = np.quantile( middle_boots, 0.995, axis = 0 )
 
-        ax.plot( ts_rel[idx_iter], middle_trace, label = f'{n_pc_cur} PCs', zorder = 200 - i_seq * 10 )
-        ax.fill_between( ts_rel[idx_iter], middle_low, middle_high,
+        ax.plot( ts_rel[idx_t_decode], middle_trace,
+            label = f'{n_pc_cur} PCs',
+            zorder = 200 - i_seq * 10,
+        )
+        ax.fill_between( ts_rel[idx_t_decode], middle_low, middle_high,
             alpha = 0.2,
             zorder = 199 - i_seq * 10,
         )
 
     #
 
-    middle_trace = np.mean( acc_cv_shuffle.T, axis = 0 )
+    middle_trace = summary_stat( acc_cv_shuffled.T )
 
-    middle_boots = boot_stat( acc_cv_shuffle.T, lambda x: np.mean( x, axis = 0 ), axis = 0,
+    middle_boots = boot_stat( acc_cv_shuffled.T, summary_stat,
+        axis = 0,
         n = 1_000,
-        verbose = False
+        rng = rng,
     )
     middle_low = np.quantile( middle_boots, 0.005, axis = 0 )
     middle_high = np.quantile( middle_boots, 0.995, axis = 0 )
 
-    ax.plot( ts_rel[idx_iter], middle_trace, color = 'k', label = 'Permuted', zorder = -100 )
-    ax.fill_between( ts_rel[idx_iter], middle_low, middle_high,
+    ax.plot( ts_rel[idx_t_decode], middle_trace,
+        color = 'k',
+        label = 'Permuted',
+        zorder = -100,
+    )
+    ax.fill_between( ts_rel[idx_t_decode], middle_low, middle_high,
         color = 'k',
         alpha = 0.2,
-        zorder = 20
+        zorder = 20,
     )
 
-    xl = window_decode
-    # yl = ax.get_ylim()
-    yl = (0.36, 1.04)
+    xl = COMPUTE_WINDOW_DECODE
+    yl = PANEL_YLIM
 
     ax.plot( xl, [0, 0], 'k-', linewidth = 1 )
 
@@ -1566,25 +1562,27 @@ with HouseStyle( grids = True ) as s:
         color = 'k',
         alpha = 0.05,
         linewidth = 0,
-        zorder = 10,
+        zorder = -1_000,
     )
 
-
-    ax.text( 5, 0.75, '+ Drug', alpha = 0.5, va = 'center' )
-
-    ax.set_xlabel( 'Time (s)' )
-    ax.set_ylabel( f'Decoding accuracy' )
+    ax.text( 5, 0.75, '+ Drug',
+        alpha = 0.5,
+        va = 'center',
+    )
 
     plt.legend( fontsize = 12 )
 
-    # s.label(
-    #     xaxis_y = 0.36,
-    #     data_xlim = (-60, 240),
-    # )
-    ax.set_xticks( [-60, 0, 60, 120, 180, 240] )
+    s.label(
+        data_ylim = (yl[0], 1.),
+        yaxis_x = xl[0],
+    )
+
+    ax.set_xticks( DECODE_XTICKS )
+    ax.set_xlabel( 'Time (s)' )
+    ax.set_ylabel( 'Decoding accuracy' )
+
     ax.set_xlim( xl )
     ax.set_ylim( yl )
-
 ```
 
 Not only are we able to decode quite well the identity of the applied compound from a *single patch* of the astrocyte network, but it is clear that the particular richness of these imaging features is necessary in order to tease the compound differences apart: while decoding from only 4 PCs gives performance above chance, increasing to 12 or 16 included PCs dramatically increases peak decoding accuracy. This indicates that what is at play here in distinguishing systematically between the two compounds is not a simple matter of intensity, or some other single aspect of the imaging: rather, a sparse but rich *subspace* of the overall DINOv3 patch embedding--space contains the information content needed to determine applied chemical identity from the induced changes in the astrocyte network. This may indicate that these image features contain a nontrivial reflection, *via* our astrocyte calcium activity observable, of underlying differences in physiological processes recruited by the two distinct pathways engaged by baclofen and *t*-ACPD (*i.e.*, GABA~B~ vs mGluR2/3 receptors).
@@ -1640,7 +1638,7 @@ Of course, the brain *also* is one-third neurons---a fact we certainly wouldn't 
 We're continuing to collate this fantastic dataset's movies of raw two-photon calcium imaging from neurons in visual cortex, in order to make this phenomenal source of neurobiological imaging data more accessible for augmenting workflows like AI fine-tuning; since neuronal and astrocytic imaging share tremendous overlap in latent image statistics, we anticipate that combining large datasets of similar dynamic imaging from the two cell types will provides immense benefits to the study of each.
 
 #### A new kind of data
-Here at Forecast, we're building out a new experimental dataset taken not from , but instead from 3D *in vitro* systems built from human induced pluripotent stem cells. Human astrocyte dynamics are a near-completely unexplored frontier within neuroscience; we are extremely excited about the potential lying within this system, as we build out OpenAstrocytes in the next few months with more and more data taken from this completely blank canvas. Stay tuned ;).
+Here at Forecast, we're building out a new experimental dataset centered not on brain slices extracted from mice, but instead on 3D <em>in vitro</em> systems built with human induced pluripotent stem cells. Human astrocyte dynamics are a near-completely unexplored frontier within neuroscience; we are extremely excited about the potential lying within this system, as we build out OpenAstrocytes in the next few months with more and more data taken from this completely blank canvas. Stay tuned ;).
 
  
 
@@ -1650,6 +1648,8 @@ Here at Forecast, we're building out a new experimental dataset taken not from ,
 
 #### Acknowledgements
 We'd like to thank **Dr. Michelle Cahill** and **Dr. Michael Reitman** for driving the original experimental work and data collection for the images that went into the initial release of OpenAstrocytes presented here.
+
+Shout out to our beta testers 🤩.
 
 Support for the production of OpenAstrocytes at Forecast was generously provided by the Special Initiatives division of the [**Astera Institute**](https://astera.org/).
 
@@ -1667,7 +1667,9 @@ Please reference this work in BibTeX as:
 ```
 
 #### AI use
-No language model tools were used to produce any of the code for or writing in this pub.
+No language model tools were used to produce any of the writing in this pub, or the original code architecture and initial implementations.
+
+Claude helped with filling out some of the documentation. If they hallucinated, let us know in our [GitHub issues](https://github.com/forecast-bio/pub-open-astrocytes/issues), and we'll give it a human touch!
 
 #### Copyright
 Copyright © 2025 Forecast Bio, Inc. The contents of this article are licensed under the Creative Commons [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) license.

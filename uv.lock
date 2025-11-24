@@ -194,7 +194,7 @@ wheels = [
 
 [[package]]
 name = "astrocytes"
-version = "0.1.1a5"
+version = "0.1.1b1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asyncstdlib" },
@@ -206,9 +206,9 @@ dependencies = [
     { name = "scipy" },
     { name = "toile" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/51/61/b89d52de28631f09c5a55d11fea81a0346c57dac9f0f6fbfc1479bb290e3/astrocytes-0.1.1a5.tar.gz", hash = "sha256:b257d8d6b673edd42fd576a073cb0807fb98178f42fc98726595466d93e8770c", size = 152830, upload-time = "2025-11-18T19:45:56.791Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d2/f6/7ab811a60b9006319ff6e85f918c6691eeb13ea7effa0dfd3f899de484a2/astrocytes-0.1.1b1.tar.gz", hash = "sha256:f2b88b47462aeaf5c1a1ffd13e344f6a30d81f242f5258de6d4844b4cab204c8", size = 27311443, upload-time = "2025-11-23T17:30:51.06Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/af/a6bb3986af1fbe4d045dfa745afd3e54dcd86ea078ba2a93051606ece132/astrocytes-0.1.1a5-py3-none-any.whl", hash = "sha256:7927e37bf9cc3d0159866fca8159a4b74bb4dd156203b737a2f9488a62c57435", size = 16164, upload-time = "2025-11-18T19:45:55.774Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/f9/fdf15b063c10c3c3be23e14ade6b5682fe78377f174d6064307fac91f312/astrocytes-0.1.1b1-py3-none-any.whl", hash = "sha256:0fba4b57ffb19baf6615bd76ebd1bf8d045e005bb944089989c677b2a5215f34", size = 22967, upload-time = "2025-11-23T17:30:49.331Z" },
 ]
 
 [[package]]
@@ -240,7 +240,7 @@ wheels = [
 
 [[package]]
 name = "atdata"
-version = "0.1.3b3"
+version = "0.1.3b4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastparquet" },
@@ -251,9 +251,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "webdataset" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f1/5a/ef8fc84e93f7ee8dc43a306aceb6766c2fec57f1277961bca0360036fe82/atdata-0.1.3b3.tar.gz", hash = "sha256:da1c7f2286e92ec55dc7dd988e048ed2a2d0c5a67d9f9496f93ea1dbdb220e11", size = 18171, upload-time = "2025-11-20T17:53:23.322Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/f1/aaf7271d1f10b556ebc4833b896dcdf4af19309cd578050dace45af6164a/atdata-0.1.3b4.tar.gz", hash = "sha256:6ea54325927c4bac6b57378d715b497a99060ef8b32c71a211f6521f00d55a7c", size = 25716, upload-time = "2025-11-23T04:22:43.713Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/21/6e/accf440dfdc2bb201b82fe050830eaa94837f455fe39a9721c3650f87d07/atdata-0.1.3b3-py3-none-any.whl", hash = "sha256:2b05872420e50f986a35bea553bde691395203bedeacf5c0d0c70979eda42698", size = 14517, upload-time = "2025-11-20T17:53:22.526Z" },
+    { url = "https://files.pythonhosted.org/packages/33/b7/7e4e54bae21a54cb02f9818bf13155c2f5d35e368da8c8a321c1fb4092f9/atdata-0.1.3b4-py3-none-any.whl", hash = "sha256:b3cb571af932a8b5f4e9199387fb551a3a07e69e678f8bf929e2d225bd5b4010", size = 21181, upload-time = "2025-11-23T04:22:42.515Z" },
 ]
 
 [[package]]
@@ -2378,7 +2378,7 @@ wheels = [
 
 [[package]]
 name = "pub-open-astrocytes"
-version = "0.1.0"
+version = "1.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "astrocytes" },
@@ -2398,14 +2398,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "astrocytes", specifier = ">=0.1.1a5" },
-    { name = "atdata", specifier = ">=0.1.3b3" },
+    { name = "astrocytes", specifier = ">=0.1.1b1" },
+    { name = "atdata", specifier = ">=0.1.3b4" },
     { name = "forecast-style", git = "https://github.com/forecast-bio/style.git" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "matplotlib", specifier = ">=3.10.7" },
     { name = "modal", specifier = ">=1.2.2" },
     { name = "numpy", specifier = ">=2.3.4" },
-    { name = "toile", specifier = ">=0.1.1a3" },
+    { name = "toile", specifier = ">=0.1.1b1" },
 ]
 
 [package.metadata.requires-dev]
@@ -3035,7 +3035,7 @@ wheels = [
 
 [[package]]
 name = "toile"
-version = "0.1.1a3"
+version = "0.1.1b1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "atdata" },
@@ -3043,9 +3043,9 @@ dependencies = [
     { name = "typer" },
     { name = "xmltodict" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/69/20/4e719b19da127a3b2a8994388111cb30de1fa1875ed2b3251ca2f7977a43/toile-0.1.1a3.tar.gz", hash = "sha256:6e65babdf448bb57064df4aebffe32ac8c8fce88957108f82949e37e032a9dbc", size = 14856, upload-time = "2025-11-20T18:03:27.872Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/65/c0c270a5f1715adad29ff3f133148a109f77b6c909315624593ed3bc424e/toile-0.1.1b1.tar.gz", hash = "sha256:2ae6521104ea61bacf370359a6fb0070870ae1f5fd8c40081f33afb92ad64e5e", size = 22108, upload-time = "2025-11-23T18:39:00.409Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e0/f5/1c3c3334c711af930c25ab885704c85a549a72d8cbfaaf53ef2dbadb2b23/toile-0.1.1a3-py3-none-any.whl", hash = "sha256:dec3d510fd964344b3a9953f95036037840506786784f750439df3bd267defd1", size = 14686, upload-time = "2025-11-20T18:03:27.053Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/09/df82e98e713188df0b1b74f281e38524102d0cb102f32365233a762f3ea1/toile-0.1.1b1-py3-none-any.whl", hash = "sha256:f40244e040b659a8cf6c0a5773e3a50ff57fc79acbe0901788c4795fa27613d6", size = 21455, upload-time = "2025-11-23T18:38:59.557Z" },
 ]
 
 [[package]]

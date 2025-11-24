@@ -193,6 +193,10 @@ The narrative contents of this article are licensed under the Creative Commons [
 
 Code contributions in this repo are licensed under the Mozilla Public License 2.0; see the [LICENSE.md](LICENSE.md) file for details.
 
-## Contact
+## Acknowledgements
 
-For questions or issues, [open a GitHub issue](https://github.com/forecast-bio/pub-open-astrocytes/issues).
+Developed by the Open Science team at [Forecast](https://forecast.bio/).
+
+Docs and README largely by Claude. If they hallucinated, let us know in the [issues](https://github.com/forecast-bio/pub-open-astrocytes/issues)!
+
+Support for the production of OpenAstrocytes and this pub at Forecast was generously provided by the Special Initiatives division of the [Astera Institute](https://astera.org/).

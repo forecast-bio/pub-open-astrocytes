@@ -73,7 +73,7 @@ All biological cells must incorporate a massive number of data-points, coming bo
 
 But astrocytes have a unique---and incredibly rich---way of signaling with calcium; the best way to appreciate it is to look at it by eye:
 
-::: {#fig-astro-video .column-screen}
+::: {#fig-astro-video .column-screen-inset-shaded}
 {{< video img/astro-events.m4v >}}
 
 (**Left**) Dynamics of astrocyte calcium, as recorded with two-photon imaging of mouse cortical slices expressing the calcium-binding fluorescent indicator GCaMP. (**Right**) Segmentation of this activity into discrete events using the AQuA toolbox. Reproduced from @wang2019accurate.
@@ -120,6 +120,9 @@ import astrocytes
 
 ##
 
+# As noted later, there is still intrinsic randomness imparted by the random
+# shuffling for `webdataset`'s streaming that is difficult to address w/o
+# support for `wids` in `atdata`
 RANDOM_SEED = 89
 rng = np.random.RandomState( RANDOM_SEED )
 
@@ -212,7 +215,7 @@ At the outset, we'll tuck away any parameters for this experimental setup that w
 #| output: false
 
 # You found me, the parameter!
-T_INTERVENE = 300
+T_INTERVENE = 300. # s
 "The applied compound begins to enter the bath at 300s after recording onset"
 ```
 
@@ -282,9 +285,10 @@ PATCH_CMAX = 110
 first_movie_frames = get_movie( FIRST_MOVIE_ID, verbose = DEV )
 first_movie_times, movie_dt = movie_times( first_movie_frames )
 
-# TODO The current `OpenAstrocytes` data architecture has imaging channels in
-# the first axis; we're refactoring the frame schemas to make channel contents
+# The current `OpenAstrocytes` data architecture has imaging channels in the
+# first axis; we're refactoring the frame schemas to make channel contents
 # explicit now that lenses easily handle conversion. Channel 0 here is GCaMP.
+# => see https://github.com/forecast-bio/open-astrocytes/issues/12
 first_frame = first_movie_frames[0]
 first_image = first_frame.image[0]
 
@@ -335,7 +339,8 @@ with HouseStyle() as s:
 
             if i_patch == 0:
                 # Show timings on top row
-                ax.set_title( f'{first_movie_times[i_t]:+0.1f}s',
+                t_disp = first_movie_times[IDX_FRAMES_COMPARE[i_t]] - T_INTERVENE
+                ax.set_title( f'{t_disp:+0.1f}s',
                     fontsize = 12,
                 )
             
@@ -398,6 +403,7 @@ from oa_pub.analysis import (
     is_between,
 )
 
+# => see https://github.com/forecast-bio/open-astrocytes/issues/14
 from astrocytes._datasets._embeddings import (
     PatchEmbeddingTrace,
 )
@@ -430,12 +436,15 @@ CAUSAL_OFFSET_FRACTION = 0.25
 PANEL_YLIM = (-8, 13)
 PANEL_XTICKS = [-90, 0, 60, 120, 180, 240]
 
+# Migration of the PCA results to the full typed schema in `astrocytes` is
+# in-progress!
+# => see https://github.com/forecast-bio/open-astrocytes/issues/13
 PATCH_EMBEDDING_TRACE_WDS_URL = (
     'https://data.forecastbio.cloud'
     + '/testing/patch-pc-traces/bath-application/'
     + 'bath_app-dinov3_vit7b16-pca64-smooth84.tar'
 )
-"TODO Migrate over the PCA results to the full typed schema in `astrocytes`"
+"URL of the atdata blob for the demo pre-computed `PatchEmbeddingTrace`s"
 
 
 ##
@@ -765,11 +774,11 @@ PLOT_WINDOW_3D = (0, 240)
 
 dataset = atdata.Dataset[PatchEmbeddingTrace]( PATCH_EMBEDDING_TRACE_WDS_URL )
 
-# TODO Unfortunately, the shuffling mechanism in WebDataset at the core of
-# this routine means that we can't avoid nondeterminism in the data streamed
-# in here, leading to intrinsic nondeterminism in the output for this pub;
-# this may be avoided in a future `atdata` release supporting `wids` for
-# indexed streaming.
+# TODO The shuffling mechanism in WebDataset inside this routine means that we
+# can't avoid nondeterminism in the data streamed in here, leading to intrinsic
+# nondeterminism in the output for this pub; this may be avoided in a future
+# `atdata` release supporting `wids` for indexed streaming.
+# => see https://github.com/foundation-ac/atdata/issues/32
 it = dataset.shuffled( batch_size = None )
 if DEV: it = tqdm( it )
 
@@ -1056,6 +1065,7 @@ from tqdm import tqdm
 import atdata
 
 import astrocytes
+# => see https://github.com/forecast-bio/open-astrocytes/issues/14
 from astrocytes._datasets._embeddings import (
     PatchEmbeddingTrace,
 )
@@ -1189,24 +1199,20 @@ from oa_pub.analysis import boot_stat
 
 ## Data parameters
 
-MODULATION_MIN_CONCENTRATION = 50. #uM
-"TODO"
+MODULATION_MIN_CONCENTRATION = 50. #µM
+"""The minimum concentration (µM) of applied compound to include in PC
+modulation analyses
+
+(This excludes recordings where there may have been little engagement, for
+demonstration purposes)
+"""
 
 MODULATION_DEMO_PCS = list( range( 8 ) )
 n_pcs_show = len( MODULATION_DEMO_PCS )
 
 
 ## Collate traces by compound
-
-COMPOUND_ALIASES = {
-    'baclofen': [
-        'baclofen',
-        'bacloffen',
-    ],
-    'tacpd': [
-        'tacpd',
-    ]
-}
+from oa_pub.analysis import COMPOUND_ALIASES
 
 ds = atdata.Dataset[PatchEmbeddingTrace]( PATCH_EMBEDDING_TRACE_WDS_URL )
 
@@ -1369,13 +1375,13 @@ COMPOUND_LABELS_DECODE = {
     'baclofen': 0,
     'tacpd': 1,
 }
-"TODO"
+"Assign an integer class label to each compound"
 
 COMPUTE_WINDOW_DECODE = (-60, 240)
-"TODO"
+"Time window across which to slide the decoding problem"
 
 SUBSAMPLING_DECODE = 20
-"TODO"
+"Decoding at each frame would be time-prohibitive; this gives a downscaling factor"
 
 N_PC_DECODE_VARIANTS = [
     4,
@@ -1395,7 +1401,6 @@ FRAC_TRAIN_DECODE = 0.8
 ## Plot parameters
 
 PANEL_YLIM = (0.37, 1.03)
-
 DECODE_XTICKS = [-60, 0, 60, 120, 180, 240]
 
 

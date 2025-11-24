@@ -1,8 +1,10 @@
 # User-added
 
-quarto_old/
-quarto/.jupyter_cache/
+/quarto_old/
+/quarto/.jupyter_cache/
 .todo
+
+/_public/
 
 ##
 

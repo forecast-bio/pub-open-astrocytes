@@ -3,3 +3,4 @@
 
 # quarto execution cache
 /index_files/**
+*.quarto_ipynb

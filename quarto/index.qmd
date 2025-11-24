@@ -565,7 +565,7 @@ Indeed, when we look at the feature dynamics across all patches within the imagi
 #| code-fold: true
 #| label: fig-patch-example-grid-pc1
 #| column: screen-inset
-#| fig-cap: "Baseline-normalized changes in DINOv3 embedding PC1 features after bath application of baclofen for each of the 196 astrocyte network patches, derived from the same slice depicted above in @fig-example-image. The locations of the two representative patches shown in greater detail in @fig-patch-examples and @fig-patch-example-traces are highlighted in black boxes. Note the heterogeneity of responses across the imaging field, as well as the correspondence between portions of the network exhibiting PC1 activation and anatomical features of the local astrocyte network in @fig-example-image. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation."
+#| fig-cap: "Baseline-normalized changes in DINOv3 embedding PC 1 features after bath application of baclofen for each of the 196 astrocyte network patches, derived from the same slice depicted above in @fig-example-image. The locations of the two representative patches shown in greater detail in @fig-patch-examples and @fig-patch-example-traces are highlighted in black boxes. Note the heterogeneity of responses across the imaging field, as well as the correspondence between portions of the network exhibiting PC1 activation and anatomical features of the local astrocyte network in @fig-example-image. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation."
 
 # For typing assists
 from matplotlib.axes import Axes
@@ -636,7 +636,7 @@ with HouseStyle() as s:
 #| code-fold: true
 #| label: fig-patch-example-grid-pc2
 #| column: screen-inset
-#| fig-cap: As in @fig-patch-example-grid-pc1, but for embedding PC2 features. Note that while the distribution of loci that exhibit modulation post-application still respects the underlying anatomy of @fig-example-image, the spatial and temporal distribution is distinct from the changes seen for PC1. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation.
+#| fig-cap: As in @fig-patch-example-grid-pc1, but for embedding PC 2 features. Note that while the distribution of loci that exhibit modulation post-application still respects the underlying anatomy of @fig-example-image, the spatial and temporal distribution is distinct from the changes seen for PC 1. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation.
 
 ## Plot params
 plot_pc = 1
@@ -679,12 +679,12 @@ with HouseStyle() as s:
     fig.subplots_adjust( wspace = 0.1, hspace = 0.1 )
 ```
 
-##### PC 4
+##### PC 5
 ```{python}
 #| code-fold: true
-#| label: fig-patch-example-grid-pc4
+#| label: fig-patch-example-grid-pc5
 #| column: screen-inset
-#| fig-cap: As in @fig-patch-example-grid-pc2, but for embedding PC4 features. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation.
+#| fig-cap: As in @fig-patch-example-grid-pc2, but for embedding PC 5 features. Time shown as seconds relative to compound entering the bath (shaded box); changes shown as multiples of the baseline distribution standard deviation.
 
 ## Plot params
 plot_pc = 4

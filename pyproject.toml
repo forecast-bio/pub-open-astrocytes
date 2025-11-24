@@ -1,6 +1,6 @@
 [project]
 name = "pub-open-astrocytes"
-version = "1.1.0"
+version = "1.2.0"
 description = "Publication code for OpenAstrocytes: AI-ready dynamic activity from the astrocyte network"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -17,9 +17,6 @@ dependencies = [
 
 [tool.uv]
 package = true
-
-[project.scripts]
-embed = "oa_pub.analysis.embed:main"
 
 [tool.uv.sources]
 forecast-style = { git = "https://github.com/forecast-bio/style.git" }

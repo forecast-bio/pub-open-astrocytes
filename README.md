@@ -187,7 +187,11 @@ If you use this code or the OpenAstrocytes dataset in your research, please cite
 
 ## License
 
-This project is released under the [LICENSE](LICENSE).
+Copyright © 2025 Forecast Bio, Inc.
+
+The narrative contents of this article are licensed under the Creative Commons [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) license.
+
+Code contributions in this repo are licensed under the Mozilla Public License 2.0; see the [LICENSE.md](LICENSE.md) file for details.
 
 ## Contact
 

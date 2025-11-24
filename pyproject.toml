@@ -5,14 +5,14 @@ description = "Publication code for OpenAstrocytes: AI-ready dynamic activity fr
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "astrocytes>=0.1.1a5",
-    "atdata>=0.1.3b3",
+    "astrocytes>=0.1.1b1",
+    "atdata>=0.1.3b4",
     "forecast-style",
     "jupyter>=1.1.1",
     "matplotlib>=3.10.7",
     "modal>=1.2.2",
     "numpy>=2.3.4",
-    "toile>=0.1.1a3",
+    "toile>=0.1.1b1",
 ]
 
 [tool.uv]

@@ -7,6 +7,8 @@ from forecast_style import HouseStyle
 
 import matplotlib.pyplot as plt
 
+#
+
 from numpy.typing import NDArray
 from matplotlib.axes import Axes
 from mpl_toolkits.mplot3d.axes3d import Axes3D
@@ -23,6 +25,7 @@ def plot_micrograph( s: HouseStyle, image: NDArray,
             **kwargs
         ):
     """TODO"""
+    ##
     
     if ax is None:
         ax = plt.gca()
@@ -52,6 +55,7 @@ def plot_trace_grid( axs, xs: NDArray, ys: list[list[NDArray]],
             highlight: list[tuple[int, int]] = [],
         ):
     """TODO"""
+    ##
 
     n_y = len( ys )
     n_x = len( ys[0] )
@@ -119,6 +123,7 @@ def plot_trajectory_3d( ax: Axes3D, vals: NDArray,
             color: str = '',
         ):
     """TODO"""
+    ##
 
     # Start dot
     ax.scatter( vals[0, 0], vals[1, 0], vals[2, 0],

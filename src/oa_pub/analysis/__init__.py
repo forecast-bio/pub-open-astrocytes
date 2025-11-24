@@ -34,6 +34,8 @@ from typing import (
 from ._constants import (
     N_PATCHES_X,
     N_PATCHES_Y,
+    #
+    COMPOUND_ALIASES,
 )
 
 from ._common import (
@@ -48,6 +50,7 @@ from ._extraction import (
 
 from ._stats import (
     baseline_normalize,
+    #
     boot_traces,
     boot_stat,
 )

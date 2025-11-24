@@ -3,23 +3,24 @@ title: '<span class="dark-highlight">OpenAstrocytes</span>'
 subtitle: '<span class="dark-highlight">AI-ready dynamic activity from the astrocyte network</span>'
 
 title-block-banner: img/astro-banner.png
+
 author-title: ''
 affiliation-title: ''
+
 published-title: 'Latest (v1.2)'
 # modified-title: 'Updated'
 
 author:
     - name: Maxine Levesque
       email: maxine@forecast.bio
-    #   affiliation: " "
 
     - name: Kira Poskanzer
       email: kira@forecast.bio
 
+    # This is a quick n dirty way to get the right spacing
     - name: " "
 
 date: 23 November 2025
-# date-modified: 31 October 2025
 
 toc-title: "OpenAstrocytes"
 
@@ -28,21 +29,22 @@ filters:
   - inline-svg
 
 reference-location: margin
-# cap-location: margin
-# citation-location: margin
 bibliography: references.bib
 csl: csl/science.csl
 
 execute:
-    # freeze: true
+    freeze: true
     cache: true
+
+repo-url: https://github.com/forecast-bio/pub-open-astrocytes
+repo-actions: [source, issue]
 ---
 
 ## tl;dr
 
 Astrocytes make up about a third of the cells in your brain, and form a second, distinct brain network from the more-studied neuronal network. As neuroscience has discovered in only the last few years, the astrocyte network carries out extremely important computations, integrating information from across different brain networks, and using this information to drive feedback to neurons that controls physiological state and maintains long-term homeostasis. To help push the field's understanding of astrocytes' unique role forward, we're releasing **OpenAstrocytes**---the largest repository of structured astrocyte calcium dynamics to date, drop-in ready for use in AI workflows.
 
-Take a look:
+Take a look:[And, if you'd like to run the analyses in this pub yourself, you can snag the full code for generating it on [GitHub](https://github.com/forecast-bio/pub-open-astrocytes).]{.aside}
 
 ``` bash
 pip install astrocytes
@@ -1672,7 +1674,7 @@ No language model tools were used to produce any of the writing in this pub, or 
 Claude helped with filling out some of the documentation. If they hallucinated, let us know in our [GitHub issues](https://github.com/forecast-bio/pub-open-astrocytes/issues), and we'll give it a human touch!
 
 #### Copyright
-Copyright © 2025 Forecast Bio, Inc. The contents of this article are licensed under the Creative Commons [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) license.
+Copyright © 2025 Forecast Bio, Inc. The narrative contents of this article are licensed under the Creative Commons [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) license.
 
  
 

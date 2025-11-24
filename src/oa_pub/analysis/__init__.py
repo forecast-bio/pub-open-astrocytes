@@ -3,6 +3,8 @@
 ##
 # Imports
 
+from tqdm import tqdm
+
 import atdata
 import astrocytes
 
@@ -10,7 +12,12 @@ from astrocytes._datasets._embeddings import PatchEmbeddingTrace
 from astrocytes.schema import BathApplicationFrame
 
 import numpy as np
+
 from numpy.typing import NDArray
+from numpy.random import RandomState
+from typing import (
+    Callable,
+)
 
 
 ##
@@ -158,6 +165,53 @@ def is_between( xs: NDArray, window: tuple[float, float] ) -> NDArray:
         (xs >= window[0])
         & (xs < window[1])
     )
+
+
+##
+
+def boot_sample_traces( Xs: NDArray,
+            axis: int = 0,
+            rng: RandomState | None = None ) -> NDArray:
+    """TODO"""
+    ##
+    if rng is None:
+        rng = RandomState()
+    sample_idx = rng.randint( Xs.shape[axis], size = (Xs.shape[axis]) )
+    return Xs[sample_idx, :]
+
+def boot_traces( Xs: NDArray,
+            n: int = 200,
+            axis: int = 0,
+            rng: RandomState | None = None,
+            verbose: bool = False
+        ) -> NDArray:
+    """TODO"""
+    ##
+    if rng is None:
+        rng = RandomState()
+    
+    ret = np.zeros( (n,) + Xs.shape )
+    it = tqdm( range( n ) ) if verbose else range( n )
+
+    for i in it:
+        ret[i] = boot_sample_traces( Xs, axis = axis, rng = rng )
+    return ret
+
+
+def boot_stat( Xs: NDArray, f: Callable[[NDArray], NDArray],
+            n: int = 200,
+            axis: int = 0,
+            rng: RandomState | None = None,
+            verbose: bool = False
+        ) -> NDArray:
+    if rng is None:
+        rng = RandomState()
+
+    it = tqdm( range( n ) ) if verbose else range( n )
+    
+    boot_stats = np.array( [ f( boot_sample_traces( Xs, axis = axis, rng = rng ) )
+                             for i in it ] )
+    return boot_stats
 
 
 #

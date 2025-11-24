@@ -1,6 +1,6 @@
-# OpenAstrocytes Publication
+# OpenAstrocytes
 
-**OpenAstrocytes: AI-ready dynamic activity from the astrocyte network**
+> 📰 *Source for reproducing the pub frontend*
 
 This repository contains the code and analysis for the [OpenAstrocytes](https://forecast.bio/research/open-astrocytes) pub, demonstrating how off-the-shelf vision transformer embeddings (DINOv3) capture rich structure in astrocyte calcium dynamics.
 

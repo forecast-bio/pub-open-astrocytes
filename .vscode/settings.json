@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "ACPD",
+        "Astera",
         "atdata",
         "baclofen",
         "bipyridine",
@@ -20,10 +21,12 @@
         "nonlocal",
         "pluripotent",
         "pretrain",
+        "randint",
         "rasa",
         "sharex",
         "sharey",
         "sklearn",
+        "SUBSAMPLING",
         "tabset",
         "tacpd",
         "tqdm",

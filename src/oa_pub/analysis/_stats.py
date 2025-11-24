@@ -1,4 +1,4 @@
-"""TODO"""
+"""Statistical analysis utilities including normalization and bootstrapping."""
 
 ##
 # Imports
@@ -21,7 +21,24 @@ from typing import (
 def baseline_normalize( ts: NDArray, ys: NDArray,
             window: tuple[float, float]
         ):
-    """TODO"""
+    """Normalize signal using baseline statistics from a specified time window.
+
+    Performs z-score normalization: (y - baseline_mean) / baseline_std
+
+    Parameters
+    ----------
+    ts : NDArray
+        Time values corresponding to signal samples
+    ys : NDArray
+        Signal values to normalize
+    window : tuple[float, float]
+        Time window [start, end) for computing baseline statistics
+
+    Returns
+    -------
+    tuple[NDArray, float, float]
+        Normalized signal, baseline mean, and baseline standard deviation
+    """
     ##
 
     filter_cur = (
@@ -36,7 +53,22 @@ def baseline_normalize( ts: NDArray, ys: NDArray,
 def _boot_traces_single( Xs: NDArray,
             axis: int = 0,
             rng: RandomState | None = None ) -> NDArray:
-    """TODO"""
+    """Generate a single bootstrap resample along specified axis.
+
+    Parameters
+    ----------
+    Xs : NDArray
+        Data array to resample
+    axis : int, default=0
+        Axis along which to resample
+    rng : RandomState or None, default=None
+        Random number generator; creates new one if None
+
+    Returns
+    -------
+    NDArray
+        Resampled array with same shape as input
+    """
     ##
 
     if rng is None:
@@ -50,7 +82,26 @@ def boot_traces( Xs: NDArray,
             rng: RandomState | None = None,
             verbose: bool = False
         ) -> NDArray:
-    """TODO"""
+    """Generate multiple bootstrap resamples of trace data.
+
+    Parameters
+    ----------
+    Xs : NDArray
+        Data array to resample
+    n : int, default=200
+        Number of bootstrap resamples to generate
+    axis : int, default=0
+        Axis along which to resample
+    rng : RandomState or None, default=None
+        Random number generator; creates new one if None
+    verbose : bool, default=False
+        Whether to show progress bar
+
+    Returns
+    -------
+    NDArray
+        Array of shape (n,) + Xs.shape containing bootstrap resamples
+    """
     ##
 
     if rng is None:
@@ -72,7 +123,28 @@ def boot_stat( Xs: NDArray, f: Callable[[NDArray], NDArray],
             rng: RandomState | None = None,
             verbose: bool = False
         ) -> NDArray:
-    """TODO"""
+    """Compute a statistic on bootstrap resamples for confidence estimation.
+
+    Parameters
+    ----------
+    Xs : NDArray
+        Data array to resample
+    f : Callable[[NDArray], NDArray]
+        Function that computes the statistic of interest on resampled data
+    n : int, default=200
+        Number of bootstrap resamples to generate
+    axis : int, default=0
+        Axis along which to resample
+    rng : RandomState or None, default=None
+        Random number generator; creates new one if None
+    verbose : bool, default=False
+        Whether to show progress bar
+
+    Returns
+    -------
+    NDArray
+        Array of computed statistics for each bootstrap resample
+    """
     ##
 
     if rng is None:

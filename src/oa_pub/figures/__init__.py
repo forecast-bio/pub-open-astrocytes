@@ -1,4 +1,4 @@
-"""TODO"""
+"""Visualization utilities for astrocyte data including micrographs, traces, and trajectories."""
 
 ##
 # Imports
@@ -24,9 +24,27 @@ def plot_micrograph( s: HouseStyle, image: NDArray,
             scale_bar: float = 100.,
             **kwargs
         ):
-    """TODO"""
+    """Plot a micrograph with a scale bar.
+
+    Parameters
+    ----------
+    s : HouseStyle
+        Forecast house style object for consistent formatting
+    image : NDArray
+        2D image array to display
+    ax : Axes or None, default=None
+        Matplotlib axes to plot on; uses current axes if None
+    scale_x : float, default=1.0
+        Scale factor for x-axis (µm per pixel)
+    scale_y : float, default=1.0
+        Scale factor for y-axis (µm per pixel)
+    scale_bar : float, default=100.0
+        Length of scale bar in µm
+    **kwargs
+        Additional arguments passed to HouseStyle.show_micrograph
+    """
     ##
-    
+
     if ax is None:
         ax = plt.gca()
 
@@ -54,7 +72,27 @@ def plot_trace_grid( axs, xs: NDArray, ys: list[list[NDArray]],
             ylim: tuple[float, float] | None = None,
             highlight: list[tuple[int, int]] = [],
         ):
-    """TODO"""
+    """Plot a grid of time series traces with optional highlighting.
+
+    Parameters
+    ----------
+    axs : array-like of Axes
+        2D array of matplotlib axes for plotting
+    xs : NDArray
+        Time values for x-axis (shared across all traces)
+    ys : list[list[NDArray]]
+        2D nested list of trace arrays, matching grid dimensions
+    color : str, default=''
+        Matplotlib color specification for trace lines
+    xticks : list[float] or None, default=None
+        Custom x-tick locations; applied only to bottom-left subplot
+    yticks : list[float] or None, default=None
+        Custom y-tick locations; applied only to bottom-left subplot
+    ylim : tuple[float, float] or None, default=None
+        Y-axis limits; if None, uses automatic limits per subplot
+    highlight : list[tuple[int, int]], default=[]
+        List of (i, j) grid positions to highlight with a border
+    """
     ##
 
     n_y = len( ys )
@@ -122,7 +160,17 @@ def plot_trace_grid( axs, xs: NDArray, ys: list[list[NDArray]],
 def plot_trajectory_3d( ax: Axes3D, vals: NDArray,
             color: str = '',
         ):
-    """TODO"""
+    """Plot a 3D trajectory with start and end markers.
+
+    Parameters
+    ----------
+    ax : Axes3D
+        3D matplotlib axes for plotting
+    vals : NDArray
+        Array of shape (3, n_timepoints) containing x, y, z coordinates
+    color : str, default=''
+        Matplotlib color specification for trajectory line and end marker
+    """
     ##
 
     # Start dot

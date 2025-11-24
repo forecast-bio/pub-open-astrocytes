@@ -1,4 +1,10 @@
-"""TODO"""
+"""Analysis tools for astrocyte calcium imaging and embedding data.
+
+This module provides utilities for:
+- Loading bath application recordings and patch embeddings
+- Statistical analysis including baseline normalization and bootstrapping
+- Time window filtering and data extraction
+"""
 
 ##
 # Imports

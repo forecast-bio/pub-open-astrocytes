@@ -1,4 +1,4 @@
-"""TODO"""
+"""Constants for analysis operations and data processing."""
 
 ##
 # Constants

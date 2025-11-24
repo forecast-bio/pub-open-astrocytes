@@ -1,4 +1,4 @@
-"""TODO"""
+"""Data extraction utilities for loading astrocyte recordings and embeddings."""
 
 ##
 # Imports
@@ -30,7 +30,20 @@ def get_movie(
             movie_uuid: str,
             verbose: bool = False
         ) -> list[BathApplicationFrame]:
-    "TODO"
+    """Load all frames for a specific recording from the bath application dataset.
+
+    Parameters
+    ----------
+    movie_uuid : str
+        Unique identifier for the recording
+    verbose : bool, default=False
+        Whether to print progress messages
+
+    Returns
+    -------
+    list[BathApplicationFrame]
+        All frames belonging to the specified recording, in temporal order
+    """
 
     def _vprint( *args, **kwargs ):
         if verbose:
@@ -66,7 +79,24 @@ def get_movie_traces(
             movie_uuid: str,
             verbose: bool = False
         ) -> list[list[PatchEmbeddingTrace]]:
-    "TODO Return all patch embedding traces for a given recording"
+    """Load all patch embedding traces for a specific recording.
+
+    Retrieves DINOv3 vision transformer patch embeddings for each frame of a
+    recording, organized spatially as a 14×14 grid.
+
+    Parameters
+    ----------
+    movie_uuid : str
+        Unique identifier for the recording
+    verbose : bool, default=False
+        Whether to print progress messages
+
+    Returns
+    -------
+    list[list[PatchEmbeddingTrace]]
+        2D list of shape (N_PATCHES_Y, N_PATCHES_X) containing embedding traces
+        for each spatial patch location
+    """
 
     def _vprint( *args, **kwargs ):
         if verbose: print( *args, **kwargs )
@@ -124,7 +154,24 @@ def get_movie_traces(
 
 
 def movie_times( fs: list[BathApplicationFrame] ) -> tuple[NDArray, float]:
-    """TODO - Pull out the correct time interpretation from individual frames"""
+    """Extract time array and frame interval from a list of recording frames.
+
+    Parameters
+    ----------
+    fs : list[BathApplicationFrame]
+        Frames from a recording, in temporal order
+
+    Returns
+    -------
+    tuple[NDArray, float]
+        Time array (in seconds) for each frame, and the time interval (dt) between frames
+
+    Notes
+    -----
+    There is a known bug in the toile export from the bath application dataset
+    that affects time metadata. This function compensates by reconstructing times
+    from the frame interval.
+    """
     ##
 
     # TODO There is a bug at present in the `toile` export from the bath app.

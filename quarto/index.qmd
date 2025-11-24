@@ -673,6 +673,7 @@ with HouseStyle() as s:
 
     plot_trace_grid( axs, ts_grid_rel[filter_grid], ys_grid,
         ylim = cur_grid_ylim,
+        xticks = GRIDS_XTICKS,
         yticks = cur_grid_yticks,
         color = f'{DEMO_PC_COLORS[plot_pc]}',
         highlight = DEMO_PATCHES,
@@ -720,6 +721,7 @@ with HouseStyle() as s:
 
     plot_trace_grid( axs, ts_grid_rel[filter_grid], ys_grid,
         ylim = cur_grid_ylim,
+        xticks = GRIDS_XTICKS,
         yticks = cur_grid_yticks,
         color = f'{DEMO_PC_COLORS[plot_pc]}',
         highlight = DEMO_PATCHES,

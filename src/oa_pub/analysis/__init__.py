@@ -8,6 +8,8 @@ from tqdm import tqdm
 import atdata
 import astrocytes
 
+# TODO pending additional typing for trace classes
+# => see https://github.com/forecast-bio/open-astrocytes/issues/15
 from astrocytes._datasets._embeddings import PatchEmbeddingTrace
 from astrocytes.schema import BathApplicationFrame
 
@@ -24,7 +26,27 @@ from typing import (
 # Constants
 
 N_PATCHES_Y = 14
+"Number of patches in the y-dimension for the embedding model"
 N_PATCHES_X = 14
+"Number of patches in the x-dimension for the embedding model"
+
+# TODO pending additional typing for trace classes
+# => see https://github.com/forecast-bio/open-astrocytes/issues/15
+COMPOUND_ALIASES = {
+    'baclofen': [
+        'baclofen',
+        'bacloffen',
+    ],
+    'tacpd': [
+        'tacpd',
+    ]
+}
+"""Different spelling variants used to indicate each applied compound
+
+There were some typos in the raw metadata for the bath-app dataset; these are
+corrected for in the `Frame` sample schemas but not for the embedding and trace
+ones yet, as they don't have explicit metadata types yet)
+"""
 
 
 ##
@@ -123,6 +145,7 @@ def get_movie_traces(
         ret[trace.i_patch][trace.j_patch] = trace
 
     # TODO We don't actually fully have assurance that ret type-checks here!
+    # Will require just a slight re-think on logic
     return ret
 
 
